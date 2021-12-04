@@ -24,7 +24,7 @@ using std::stringstream;
 
 //Variables globales
 //TODO:ARREGLAR PATH 
-string path="url";
+string path="/home/eduardo/Escritorio/Archivos Vacas/Proyecto_1/Proyecto_1";
 
 //ESTRUCTURAS GENERALES
 struct Particion
@@ -143,8 +143,21 @@ vector<string> SplitSpace(string text){
     return lineSplit;
 }
 
+void mkcarpetas(string entrada){
+    vector<string> aux2;
+    aux2 = Split(entrada,"/");//Se crea un vector que esta spliteado por el simbolo / para poder crear las carpetas deseadas por si no existen.
+    string variable;//String que almacenara las carpetas a crear o creadas
+    for(size_t j=1; j<(aux2.size()-1); j++){//Ciclo que se recorre desde 1 hasta el tamanio del path menos 1 ya que la ultima posicion contiene el nombre deldisco  a crear, se empieza de 1 ya que la posicion 0 es posicion vacia que esta antes de el primer simboo /
+        variable =variable+aux2[j]+"/";
+        char sc[variable.size() + 1];
+        strcpy(sc,variable.c_str());//Casteamos el string a char ya que la funcion mkdir recibe una variable de tipo char* con la direccion del directorio a crear
+        mkdir(sc, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); //creamos la carpeta recursivamene                       
+    }
+}
+
+
+
 void EjecutarComando(char comando[200]){
-    cout<<"estoy ejecutando"<<endl;
     if(comando[0]!='#'){//Validacion por si viene un comentario antes de una instruccion o comando
         for(int i=0;i<=200;i++){
             if(comando[i]=='#'){//validacion por si viene un comentario al final de la linea
@@ -167,8 +180,7 @@ void EjecutarComando(char comando[200]){
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
                     if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
-                        // TODO:ARREGLAR
-                        //mkcarpetas(auxiliar[1]);
+                        mkcarpetas(auxiliar[1]);//Creamos las carpetas con el path ingresado.
                         Disk1.path = auxiliar[1];//Asignamos el path al disco
                     }
                     else if(auxiliar[0]=="-FIT"){//Asignamos el fit al disco

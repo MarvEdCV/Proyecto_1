@@ -180,6 +180,7 @@ void EjecutarComando(char comando[200]){
             pause = cin.get();
         }
         vector<string>lineSplit = SplitSpace(comandoCasteado);//Spliteamos por espacios
+        bool sizeerror,fiterror,uniterror =false;
             if(lineSplit[0]=="MKDISK"){
                 bool unit,fit = false;//Variables booleanas que se estableceran por defecto si no se declaran en el comando si son false se pondran en automatico por defecto segun enunciado
                 vector<string> auxiliar;
@@ -190,14 +191,29 @@ void EjecutarComando(char comando[200]){
                         Disk1.path = auxiliar[1];//Asignamos el path al disco
                     }
                     else if(auxiliar[0]=="-FIT"){//Asignamos el fit al disco
-                        Disk1.fit= auxiliar[1];
-                        fit = true;
+                        if(auxiliar[1]=="BF" || auxiliar[1]=="FF" || auxiliar[1]=="WF"){
+                            Disk1.fit= auxiliar[1];
+                            fit = true;
+                        }else{
+                            fiterror = true;
+                            cout<<"Error: Esta tratando de ingresar un ajuste no permitido"<<endl;
+                        }    
                     }
                     else if(auxiliar[0]=="-UNIT"){//Asignamos la unidad al disco
-                        Disk1.unit = auxiliar[1];
-                        unit = true;
+                        if(auxiliar[1]=="M" || auxiliar[1]=="K"){
+                            Disk1.unit = auxiliar[1];
+                            unit = true;
+                        }else{
+                            uniterror = true;
+                            cout<<"Error: Esta tratando de ingresar una unidad no permitida"<<endl;
+                        }
+                        
                     }
                     else if(auxiliar[0] == "-SIZE"){//Asignamos el tamanio al disco
+                        if(stof(auxiliar[1])<=0){
+                            sizeerror = true;
+                            cout<<"Error: El tamaño del disco no puede ser negativo o igual a cero"<<endl;
+                        }
                         Disk1.size = stof(auxiliar[1]);
                     }
                 }
@@ -207,7 +223,11 @@ void EjecutarComando(char comando[200]){
                 if(unit==false){//Asignacion default
                     Disk1.unit ="M";
                 }
-                CrearDisco(Disk1);//Creamos disco
+                if(sizeerror || uniterror || fiterror){
+                    cout<<"No se pudo crear el disco!!"<<endl;
+                }else{
+                    CrearDisco(Disk1);//Creamos disco
+                }                
             }
             if(lineSplit[0]=="RMDISK"){
                 string dir;

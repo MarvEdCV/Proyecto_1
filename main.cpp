@@ -154,7 +154,15 @@ void mkcarpetas(string entrada){
         mkdir(sc, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); //creamos la carpeta recursivamene                       
     }
 }
-
+void borrardisco(string ruta){//Metodo que recibe como parametro un path a eliminar.
+    if(remove(ruta.c_str())==0) // Eliminamos el archivo
+    {
+        cout<<"El archivo fue eliminado satisfactoriamente\n"<<endl;
+    }
+    else{
+        cout<<"No se pudo eliminar el archivo\n"<<endl;
+    }
+}
 
 
 void EjecutarComando(char comando[200]){
@@ -202,6 +210,15 @@ void EjecutarComando(char comando[200]){
                     Disk1.unit ="M";
                 }
                 CrearDisco(Disk1);//Creamos disco
+            }
+            if(lineSplit[0]=="RMDISK"){
+                string dir;
+                vector<string> aux;
+                aux = Split(lineSplit[1],"~:~");
+                if(aux[0] == "-PATH"){
+                    dir = path+aux[1];
+                    borrardisco(dir); 
+                }           
             }
     }
 }

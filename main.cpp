@@ -142,7 +142,6 @@ vector<string> SplitSpace(string text){
     }
     return lineSplit;
 }
-
 void mkcarpetas(string entrada){
     vector<string> aux2;
     aux2 = Split(entrada,"/");//Se crea un vector que esta spliteado por el simbolo / para poder crear las carpetas deseadas por si no existen.
@@ -164,7 +163,6 @@ void borrardisco(string ruta){//Metodo que recibe como parametro un path a elimi
     }
 }
 
-
 void EjecutarComando(char comando[200]){
     if(comando[0]!='#'){//Validacion por si viene un comentario antes de una instruccion o comando
         for(int i=0;i<=200;i++){
@@ -177,7 +175,7 @@ void EjecutarComando(char comando[200]){
         int aa = strncmp(comando,"PAUSE",5);
         if(aa==0){
             int pause;
-            cout<<"Script pausado!\n"<<"Presione Enter para continuar\n";
+            cout<<"******       Script pausado!       ******\n"<<"******Presione Enter para continuar******\n";
             //pausamos
             pause = cin.get();
         }
@@ -222,7 +220,25 @@ void EjecutarComando(char comando[200]){
             }
     }
 }
-
+vector<string> lineas;//Vector que almacenara las lineas
+void leerscript(string ruta){//Metodo que recibe como parameto la ruta del script con comandos a ejecutar
+    FILE *script;
+    if((script = fopen(ruta.c_str(),"r"))){//Si se encuentra el archivo y se puede abrir con exito
+        char line[200]="";//declaramos un arreglo de char para poder almacenar linea individualmente 
+        memset(line,0,sizeof(line));
+        while(fgets(line,sizeof line,script)){//Mientras se lea una linea con salto de linea se ejecutara el while  
+            if(line[0]!='\n'){//Obtenemos el dato de cada linea
+                cout <<"SCRIPT: "<< line << endl;//Imprimimos el comando
+                lineas.push_back(line);//Pusheamos la linea al arreglo
+                EjecutarComando(line);//Ejecutamos el comando
+            }
+            memset(line,0,sizeof(line));
+        }
+        fclose(script);//Cerramos el archivo.
+    }else{
+        cout << "Error al abrir el SCRIPT" << endl;
+    }    
+}
 int main(int argc, char const *argv[])
 {
     cout<<"********************************************"<<endl;
@@ -240,8 +256,13 @@ int main(int argc, char const *argv[])
         string tmp=CastearMayuscula(Linea_Comando);//Casteamos a mayuscula toda la linea para evitarnos problemas del case-insensitive.
         vector<string> ls= SplitSpace(tmp);
         if(ls[0]=="EXEC"){
-            cout<<"SOY UN SCRIPT"<<endl;
-           //TODO: arreglar esto.
+            vector<string> aux;
+            aux = Split(ls[1],"~:~");
+            if(aux[0]=="-PATH"){
+                string ruta;
+                ruta = path+aux[1];
+                leerscript(ruta);
+            }
         }
         else{
             EjecutarComando(Linea_Comando);

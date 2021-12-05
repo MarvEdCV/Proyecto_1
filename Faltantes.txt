@@ -1,0 +1,2 @@
+1. Solamente genera carpetas/directorios en la ruta quemada que es la del proyecto.
+2. No tengo codificado para aceptar rutas con espacios.

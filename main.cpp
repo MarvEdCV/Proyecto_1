@@ -24,7 +24,7 @@ using std::stringstream;
 
 //Variables globales
 //TODO:ARREGLAR PATH 
-string path="/home/eduardo/Escritorio/Archivos Vacas/Proyecto_1/Proyecto_1";
+string path="/home/eduardo/Escritorio/ArchivosVacas/Proyecto_1/Proyecto_1";
 
 //ESTRUCTURAS GENERALES
 struct Particion

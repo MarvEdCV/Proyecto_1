@@ -21,7 +21,9 @@ using std::cout; using std::cin;
 using std::endl; using std::string;
 using std::vector; using std::istringstream;
 using std::stringstream;
-
+//Metodos globales
+void ParticionPrimaria(int,char,string,string,string);
+bool ExisteParticion(string,string);
 //Variables globales
 //TODO:ARREGLAR PATH 
 string path="/home/eduardo/Escritorio/ArchivosVacas/Proyecto_1/Proyecto_1";
@@ -36,19 +38,29 @@ struct Particion
     int part_size;
     char part_name[16];
 };
+
 struct MBR
 {
     int mbr_tamano;
     time_t mbr_fecha_creacion;
     int mbr_disk_signature;
-    string disk_fit;
+    char disk_fit;
     Particion mbr_partition[4];
 };
+struct EBR{
+    char part_status; 
+    char part_fit; 
+    int part_start; 
+    int part_size; 
+    int part_next; 
+    char part_name[16]; 
+};
+
 struct DiscoD{ 
 	string path="";
 	int size;
 	string unit="M"; /// k=kb m=mb megabytes como default
-    string fit="FF";//Primer ajuste como default.
+    char fit='F';//Primer ajuste como default.
 }
 Disk1;
 void CrearDisco(DiscoD op){
@@ -89,7 +101,7 @@ cout<<"************************CREANDO DISCO*************************\n"<<endl;
         mbr.mbr_partition[i].part_status = '0';
         mbr.mbr_partition[i].part_size = 0;
         mbr.mbr_partition[i].part_fit = 'W';
-        mbr.mbr_partition[i].part_start = tam;
+        mbr.mbr_partition[i].part_start = -1;
         strcpy(mbr.mbr_partition[i].part_name,"");
     }
     
@@ -159,7 +171,7 @@ void borrardisco(string ruta){//Metodo que recibe como parametro un path a elimi
         cout<<"El archivo fue eliminado satisfactoriamente\n"<<endl;
     }
     else{
-        cout<<"No se pudo eliminar el archivo\n"<<endl;
+        cout<<"Error: No se pudo eliminar el archivo\n"<<endl;
     }
 }
 
@@ -180,8 +192,8 @@ void EjecutarComando(char comando[200]){
             pause = cin.get();
         }
         vector<string>lineSplit = SplitSpace(comandoCasteado);//Spliteamos por espacios
-        bool sizeerror,fiterror,uniterror =false;
             if(lineSplit[0]=="MKDISK"){
+                int sizeerror,fiterror,uniterror =0;
                 bool unit,fit = false;//Variables booleanas que se estableceran por defecto si no se declaran en el comando si son false se pondran en automatico por defecto segun enunciado
                 vector<string> auxiliar;
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
@@ -189,13 +201,18 @@ void EjecutarComando(char comando[200]){
                     if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
                         mkcarpetas(auxiliar[1]);//Creamos las carpetas con el path ingresado.
                         Disk1.path = auxiliar[1];//Asignamos el path al disco
-                    }
-                    else if(auxiliar[0]=="-FIT"){//Asignamos el fit al disco
-                        if(auxiliar[1]=="BF" || auxiliar[1]=="FF" || auxiliar[1]=="WF"){
-                            Disk1.fit= auxiliar[1];
+                    }else if(auxiliar[0]=="-FIT"){//Asignamos el fit al disco
+                        if(auxiliar[1]=="BF"){
+                            Disk1.fit= 'B';
+                            fit = true;
+                        }else if(auxiliar[1]=="FF"){
+                            Disk1.fit= 'F';
+                            fit = true;
+                        }else if(auxiliar[1]=="WF"){
+                            Disk1.fit= 'W';
                             fit = true;
                         }else{
-                            fiterror = true;
+                            fiterror = 1;
                             cout<<"Error: Esta tratando de ingresar un ajuste no permitido"<<endl;
                         }    
                     }
@@ -204,32 +221,33 @@ void EjecutarComando(char comando[200]){
                             Disk1.unit = auxiliar[1];
                             unit = true;
                         }else{
-                            uniterror = true;
-                            cout<<"Error: Esta tratando de ingresar una unidad no permitida"<<endl;
+                            uniterror = 1;
+                            cout<<"Error: Esta tratando de ingresar una unidad no permitida para crear disco"<<endl;
                         }
                         
                     }
                     else if(auxiliar[0] == "-SIZE"){//Asignamos el tamanio al disco
                         if(stof(auxiliar[1])<=0){
-                            sizeerror = true;
+                            sizeerror = 1;
                             cout<<"Error: El tamaño del disco no puede ser negativo o igual a cero"<<endl;
-                        }
-                        Disk1.size = stof(auxiliar[1]);
+                        }else{
+                            Disk1.size = stof(auxiliar[1]);
+                        }                        
                     }
                 }
                 if(fit==false){//Asignacion default
-                    Disk1.fit = "FF";
+                    Disk1.fit = 'F';
                 }
                 if(unit==false){//Asignacion default
                     Disk1.unit ="M";
                 }
-                if(sizeerror || uniterror || fiterror){
+                if(sizeerror==1 || uniterror==1 || fiterror==1){
+                    cout<<sizeerror<<"a"<<uniterror<<"b"<<fiterror<<"c"<<endl;
                     cout<<"No se pudo crear el disco!!"<<endl;
                 }else{
                     CrearDisco(Disk1);//Creamos disco
                 }                
-            }
-            if(lineSplit[0]=="RMDISK"){
+            }else if(lineSplit[0]=="RMDISK"){
                 string dir;
                 vector<string> aux;
                 aux = Split(lineSplit[1],"~:~");
@@ -237,7 +255,98 @@ void EjecutarComando(char comando[200]){
                     dir = path+aux[1];
                     borrardisco(dir); 
                 }           
-            }
+            }else if(lineSplit[0]=="FDISK"){
+                cout<<"entre a fdisk"<<endl;
+                int sizeerror,fiterror,uniterror,typeerror =0;
+                int sizepart;
+                char unitpart;
+                string rutapart;
+                char fitpart;
+                string namepart; 
+                char typepart;
+                bool deffit,deftype,defunit=false;
+                vector<string> auxiliar;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    if(auxiliar[0] == "-SIZE"){//Si el comando es el -path entonces entrara a esta condicional
+                        if(stof(auxiliar[1])<=0){
+                            sizeerror = 1;
+                            cout<<"Error: Esta tratando de ingresar una unidad no permitida para crear particion"<<endl;
+                        }else{
+                            sizepart = stof(auxiliar[1]);
+                        }
+                    }else if(auxiliar[0]=="-UNIT"){
+                        if(auxiliar[1]=="M"){
+                            unitpart = 'M';
+                            defunit = true;
+                        }else if(auxiliar[1]=="K"){
+                            unitpart = 'K';
+                            defunit = true;
+                        }else if(auxiliar[1]=="B"){
+                            unitpart = 'B';
+                            defunit = true;
+                        }else{
+                            uniterror = 1;
+                            cout<<"Error: Esta tratando de ingresar una unidad no permitida para crear una particion"<<endl;
+                        }    
+                    }else if(auxiliar[0]=="-PATH"){
+                        rutapart = auxiliar[1];    
+                    }else if(auxiliar[0]=="-TYPE"){
+                        if(auxiliar[1]=="P"){
+                            typepart = 'P';
+                            deftype = true;
+                        }else if(auxiliar[1]=="E"){
+                            typepart = 'E';
+                            deftype = true;
+                        }else if(auxiliar[1]=="L"){
+                            typepart = 'L';
+                            deftype = true;
+                        }else{
+                            typeerror = 1;
+                            cout<<"Error: Esta tratando de ingresar un tipo incompatible con las que se pueden crear particiones utiliza P,E o L"<<endl;
+                        } 
+                    }else if(auxiliar[0]=="-FIT"){//Asignamos el fit a la particion
+                        if(auxiliar[1]=="BF"){
+                            fitpart = 'b';
+                            deffit = true;
+                        }else if(auxiliar[1]=="WF"){
+                            fitpart = 'w';
+                            deffit = true;
+                        }else if(auxiliar[1]=="FF"){
+                            fitpart = 'f';
+                            deffit = true;
+                        }else{
+                            fiterror = 1;
+                            cout<<"Error: Esta tratando de ingresar un ajuste no permitido para la particion"<<endl;
+                        }    
+                    }else if(auxiliar[0]=="-NAME"){
+                        namepart = auxiliar[1];                       
+                    }
+                }
+                if(!defunit){//Establecemos valor default de las unidades si no viene en el comando
+                    unitpart = 'K';
+                }
+                if(!deffit){//Establecemos valor default de el fit si no viene en el comando.
+                    fitpart = 'W';
+                }
+                if(!deftype || typepart=='P'){//Creamos particion primaria si no viene establecido en el comando el tipo de particion
+                    //Creamos la particion primaria
+                    cout<<"size: "<<sizepart<<endl;
+                    cout<<"unit: "<<unitpart<<endl;
+                    cout<<"ruta: "<<rutapart<<endl;
+                    cout<<"fit: "<<fitpart<<endl;
+                    cout<<"name: "<<namepart<<endl;
+                    //crearParticionPrimaria(rutapart,namepart,sizepart,fitpart,unitpart);
+
+
+                }else if(deftype){
+                    if(typepart=='E'){
+                        cout<<"Soy particion extendida :D"<<endl;
+                    }else if(typepart=='L'){
+                        cout<<"Soy particion logica :D"<<endl;
+                    }
+                }  
+            }//agregar defaults y tambien posibles errores.
     }
 }
 vector<string> lineas;//Vector que almacenara las lineas
@@ -259,16 +368,15 @@ void leerscript(string ruta){//Metodo que recibe como parameto la ruta del scrip
         cout << "Error al abrir el SCRIPT" << endl;
     }    
 }
+//--------------------------------------------------------------------------------------------------------------------------------------------------------
+
 int main(int argc, char const *argv[])
 {
     cout<<"********************************************"<<endl;
     cout<<"**          HARD DISK SIMULATION          **"<<endl;
     cout<<"**               201905554                **"<<endl;
     cout<<"******************************************** \n"<<endl;
-    char Linea_Comando[200];//Comando a leer con un tamanio estimado maximo de 200 caracteres
-    //string delimitador="~:~";
-    //vector<string> vectorprueba=Split(Linea_Comando,delimitador);
-    //for(auto i:vectorprueba)cout<<i<<endl;
+    char Linea_Comando[200];
     
     while((string)Linea_Comando!="EXIT"){
         cout<<"Command :: ";

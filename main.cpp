@@ -22,7 +22,7 @@ using std::endl; using std::string;
 using std::vector; using std::istringstream;
 using std::stringstream;
 //Metodos globales
-void ParticionPrimaria(int,char,string,string,string);
+void ParticionPrimaria(int,char,string,char,string);
 bool ExisteParticion(string,string);
 //Variables globales
 //TODO:ARREGLAR PATH 
@@ -307,13 +307,13 @@ void EjecutarComando(char comando[200]){
                         } 
                     }else if(auxiliar[0]=="-FIT"){//Asignamos el fit a la particion
                         if(auxiliar[1]=="BF"){
-                            fitpart = 'b';
+                            fitpart = 'B';
                             deffit = true;
                         }else if(auxiliar[1]=="WF"){
-                            fitpart = 'w';
+                            fitpart = 'W';
                             deffit = true;
                         }else if(auxiliar[1]=="FF"){
-                            fitpart = 'f';
+                            fitpart = 'F';
                             deffit = true;
                         }else{
                             fiterror = 1;
@@ -331,13 +331,13 @@ void EjecutarComando(char comando[200]){
                 }
                 if(!deftype || typepart=='P'){//Creamos particion primaria si no viene establecido en el comando el tipo de particion
                     //Creamos la particion primaria
+                    cout<<"-----Datos Partición a Crear-----"<<endl;
                     cout<<"size: "<<sizepart<<endl;
                     cout<<"unit: "<<unitpart<<endl;
                     cout<<"ruta: "<<rutapart<<endl;
                     cout<<"fit: "<<fitpart<<endl;
                     cout<<"name: "<<namepart<<endl;
-                    //crearParticionPrimaria(rutapart,namepart,sizepart,fitpart,unitpart);
-
+                    ParticionPrimaria(sizepart,unitpart,rutapart,fitpart,namepart);
 
                 }else if(deftype){
                     if(typepart=='E'){
@@ -369,7 +369,192 @@ void leerscript(string ruta){//Metodo que recibe como parameto la ruta del scrip
     }    
 }
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
+bool ExisteParticion(string ruta, string name){
+    int extendida = -1;
+    FILE *filiPart;
+    if((filiPart = fopen(ruta.c_str(),"rb+"))){
+        MBR mbr;
+        fseek(filiPart,0,SEEK_SET);
+        fread(&mbr, sizeof(MBR),1,filiPart);
+        for(int i = 0; i < 4; i++){
+            if(strcmp(mbr.mbr_partition[i].part_name,name.c_str()) == 0){
+                fclose(filiPart);
+                return true;
+            }else if(mbr.mbr_partition[i].part_type == 'E'){
+                extendida = i;
+            }
+        }
+        if(extendida != -1){
+            fseek(filiPart, mbr.mbr_partition[extendida].part_start,SEEK_SET);
+            EBR extendedBoot;
+            while((fread(&extendedBoot,sizeof(EBR),1,filiPart))!=0 && (ftell(filiPart) < (mbr.mbr_partition[extendida].part_size + mbr.mbr_partition[extendida].part_start))){
+                if(strcmp(extendedBoot.part_name,name.c_str()) == 0){
+                    fclose(filiPart);
+                    return true;
+                }
+                if(extendedBoot.part_next == -1){
+                    fclose(filiPart);
+                    return false;
+                }
+            }
+        }
+    }
+    fclose(filiPart);
+    return false;
+}
 
+//FDISK MANEJO DE PARTICIONES
+void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
+    char fittmp = 0;
+    char unittmp = 0;
+    int sizetmp;
+    char buffer = '1';
+    if(fit!=0){//Verificamos si no viene "vacio" el fit.
+        fittmp = fit;
+    }else{
+        fittmp = 'W';//Peor ajuste por default
+    }
+    //Validamos la unidad y le damos el tamanio a la particion dependiendo de la unidad ingresada.
+    if(unit!=0){
+        unittmp = unit;
+        if(unittmp == 'B'){
+            sizetmp = size;
+        }else if(unittmp == 'K'){
+            sizetmp = size *1024;
+        }else if(unittmp == 'M'){
+            sizetmp = size * 1024 * 1024;
+        }else{
+            cout<<"Error: No esta ingresando una unidad permitida para la creacion de la particion primaria!!"<<endl;
+        }
+    }else{
+        unittmp = 'K';
+        sizetmp = size * 1024;
+    }
+
+    FILE *fileprimary;
+    MBR mbr;
+    string rutatmp = path + ruta; 
+    if((fileprimary = fopen(rutatmp.c_str(),"rb+"))){//Abrimos la ruta del disco y lo abrimos con rb+ para actualizar el archivo binario permitiendo tanto lectura como escritura 
+        bool espacioDisponible = false;//Varible para saber si hay espacio para agregar la particion
+        int contadorParticion = 0;//Contador para ver cuantas particiones hay.
+        fseek(fileprimary,0,SEEK_SET);//Sitúa el puntero de lectura/escritura de un archivo en la posición indicada, 0 para que se situe al inicio del archivo
+        fread(&mbr,sizeof(MBR),1,fileprimary);//Leemos el archivo mbr que esta dentro del disco.
+        //Verificamos en el mbr si hay particiones disponibles.
+        for(int i=0; i < 4; i++){
+            if(mbr.mbr_partition[i].part_start == -1 || (mbr.mbr_partition[i].part_status=='1') && (mbr.mbr_partition[i].part_size>=sizetmp) ){
+                espacioDisponible = true;
+                contadorParticion = i;
+                break;
+            }
+        }
+        if(espacioDisponible){//verificamos si el espacio si es suficiente o no
+            int bytes=0;
+            for(int i=0; i < 4; i++){
+                if(mbr.mbr_partition[i].part_status!='1'){//verificamos que las particiones no esten en estado activo
+                    bytes += mbr.mbr_partition[i].part_size;//Sumamos el espacio disponible en las particiones NO ACTIVAS
+                }
+            }
+            cout<<"Espacio Disponible: "<<mbr.mbr_tamano-bytes << " Bytes" <<endl;
+            cout<<"Espacio Necesario para particion primaria: "<<sizetmp<<" Bytes"<<endl;
+            if((mbr.mbr_tamano-bytes)>=sizetmp){//Verificamos si el tamanio es suficiente para poder aniadir la particion
+                if(!ExisteParticion(rutatmp,name)){
+                    if(mbr.disk_fit=='F'){//First Fit
+                        mbr.mbr_partition[contadorParticion].part_type = 'P';
+                        mbr.mbr_partition[contadorParticion].part_fit = fittmp;
+                        if(contadorParticion==0){
+                            mbr.mbr_partition[contadorParticion].part_start = sizeof(mbr);
+                        }else{
+                            mbr.mbr_partition[contadorParticion].part_start=mbr.mbr_partition[contadorParticion-1].part_start+mbr.mbr_partition[contadorParticion-1].part_size;
+                        }
+                        mbr.mbr_partition[contadorParticion].part_size = sizetmp;
+                        mbr.mbr_partition[contadorParticion].part_status = '0';
+                        strcpy(mbr.mbr_partition[contadorParticion].part_name,name.c_str());
+                        fseek(fileprimary,0,SEEK_SET);
+                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo masterboot
+                        fseek(fileprimary,mbr.mbr_partition[contadorParticion].part_start,SEEK_SET);//Guardamos los bytes de la particion
+                        for(int i=0; i < sizetmp; i++){
+                            fwrite(&buffer,1,1,fileprimary);
+                        }
+                        cout<<"\n Particion creada con exito de tipo FIRST FIT!!!"<<endl;
+                    }else if(mbr.disk_fit=='B'){//Best Fit
+                        int best = contadorParticion;
+                        for(int i = 0; i < 4; i++){
+                            if(mbr.mbr_partition[i].part_start == -1 || (mbr.mbr_partition[i].part_status == '1' && mbr.mbr_partition[i].part_size>=sizetmp)){
+                                if(i != contadorParticion){
+                                    if(mbr.mbr_partition[best].part_size > mbr.mbr_partition[i].part_size){
+                                        best = i;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        mbr.mbr_partition[best].part_type='P';
+                        mbr.mbr_partition[best].part_fit = fittmp;
+                        //Incio de particion
+                        if(best==0){//Primera posicion
+                            mbr.mbr_partition[best].part_start = sizeof(mbr);
+                        }else{
+                            mbr.mbr_partition[best].part_start = mbr.mbr_partition[best-1].part_start + mbr.mbr_partition[best-1].part_size;//Iniciamos la particion en la primera posicion vacia.
+                        }
+                        mbr.mbr_partition[best].part_size = sizetmp;
+                        mbr.mbr_partition[best].part_status = '0';//Estado Activado.
+                        strcpy(mbr.mbr_partition[best].part_name,name.c_str());//Renombramos
+                        //Guardamos en MBR new
+                        fseek(fileprimary,0,SEEK_SET);
+                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo masterboot
+                        fseek(fileprimary,mbr.mbr_partition[best].part_start,SEEK_SET);//Guardamos los bytes de la particion
+                        for(int i=0; i < sizetmp; i++){
+                            fwrite(&buffer,1,1,fileprimary);
+                        }
+                        cout<<"\n Particion creada con exito de tipo BEST FIT!!!"<<endl;
+                    }else if(mbr.disk_fit == 'W'){//WORST FIT
+                        cout<<"Particion worst fit"<<endl;
+                        int  worst= contadorParticion;
+                        for(int i = 0; i < 4; i++){
+                            if(mbr.mbr_partition[i].part_start == -1 || (mbr.mbr_partition[i].part_status == '1' && mbr.mbr_partition[i].part_size>=sizetmp)){
+                                if(i != contadorParticion){
+                                    if(mbr.mbr_partition[worst].part_size < mbr.mbr_partition[i].part_size){
+                                        worst = i;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        mbr.mbr_partition[worst].part_type = 'P';
+                        mbr.mbr_partition[worst].part_fit = fittmp;
+                        //Inicio de la particion
+                        if(worst == 0){//Por si es la primera opcion
+                            mbr.mbr_partition[worst].part_start = sizeof(mbr);
+                        }else{
+                            mbr.mbr_partition[worst].part_start = mbr.mbr_partition[worst-1].part_start + mbr.mbr_partition[worst-1].part_size;
+                        }
+                        mbr.mbr_partition[worst].part_size = sizetmp;
+                        mbr.mbr_partition[worst].part_status = '0';//Activamos la particion
+                        strcpy(mbr.mbr_partition[worst].part_name,name.c_str());
+                        //Guardamos en MBR nes
+                        fseek(fileprimary,0,SEEK_SET);
+                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo masterboot
+                        fseek(fileprimary,mbr.mbr_partition[worst].part_start,SEEK_SET);//Guardamos los bytes de la particion
+                        for(int i = 0; i < sizetmp; i++){
+                            fwrite(&buffer,1,1,fileprimary);
+                        }
+                        cout <<"\n Particion creada con exito de tipo WORST FIT!!!"<<endl;
+                    }
+                
+                }else{
+                    cout<<"Error: La particion ya existe!!"<<endl;
+                }  
+            }else{
+                cout<<"Error: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre"<<endl;
+            }
+        }else{
+            cout<<"Error: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear otra particion primaria!!"<<endl;
+        }
+        fclose(fileprimary);//Cerramos disco.
+    }else{
+        cout<<"Error: No se pudo abrir el disco, es posible que no exista!!"<<endl;
+    }
+}
 int main(int argc, char const *argv[])
 {
     cout<<"********************************************"<<endl;

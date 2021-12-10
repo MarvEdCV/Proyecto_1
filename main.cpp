@@ -23,6 +23,7 @@ using std::vector; using std::istringstream;
 using std::stringstream;
 //Metodos globales
 void ParticionPrimaria(int,char,string,char,string);
+void PaticionExtendida(int,char,string,char,string);
 bool ExisteParticion(string,string);
 //Variables globales
 //TODO:ARREGLAR PATH 
@@ -341,7 +342,7 @@ void EjecutarComando(char comando[200]){
 
                 }else if(deftype){
                     if(typepart=='E'){
-                        cout<<"Soy particion extendida :D"<<endl;
+                        PaticionExtendida(sizepart,unitpart,rutapart,fitpart,namepart);
                     }else if(typepart=='L'){
                         cout<<"Soy particion logica :D"<<endl;
                     }
@@ -386,13 +387,13 @@ bool ExisteParticion(string ruta, string name){
         }
         if(extendida != -1){
             fseek(filiPart, mbr.mbr_partition[extendida].part_start,SEEK_SET);
-            EBR extendedBoot;
-            while((fread(&extendedBoot,sizeof(EBR),1,filiPart))!=0 && (ftell(filiPart) < (mbr.mbr_partition[extendida].part_size + mbr.mbr_partition[extendida].part_start))){
-                if(strcmp(extendedBoot.part_name,name.c_str()) == 0){
+            EBR ebr;
+            while((fread(&ebr,sizeof(EBR),1,filiPart))!=0 && (ftell(filiPart) < (mbr.mbr_partition[extendida].part_size + mbr.mbr_partition[extendida].part_start))){
+                if(strcmp(ebr.part_name,name.c_str()) == 0){
                     fclose(filiPart);
                     return true;
                 }
-                if(extendedBoot.part_next == -1){
+                if(ebr.part_next == -1){
                     fclose(filiPart);
                     return false;
                 }
@@ -475,7 +476,7 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                         for(int i=0; i < sizetmp; i++){
                             fwrite(&buffer,1,1,fileprimary);
                         }
-                        cout<<"\n Particion creada con exito de tipo FIRST FIT!!!"<<endl;
+                        cout<<"\n Particion PRIMARIA creada con exito de tipo FIRST FIT!!!"<<endl;
                     }else if(mbr.disk_fit=='B'){//Best Fit
                         int best = contadorParticion;
                         for(int i = 0; i < 4; i++){
@@ -506,7 +507,7 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                         for(int i=0; i < sizetmp; i++){
                             fwrite(&buffer,1,1,fileprimary);
                         }
-                        cout<<"\n Particion creada con exito de tipo BEST FIT!!!"<<endl;
+                        cout<<"\n Particion PRIMARIA creada con exito de tipo BEST FIT!!!"<<endl;
                     }else if(mbr.disk_fit == 'W'){//WORST FIT
                         cout<<"Particion worst fit"<<endl;
                         int  worst= contadorParticion;
@@ -538,7 +539,7 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                         for(int i = 0; i < sizetmp; i++){
                             fwrite(&buffer,1,1,fileprimary);
                         }
-                        cout <<"\n Particion creada con exito de tipo WORST FIT!!!"<<endl;
+                        cout <<"\n Particion PRIMARIA creada con exito de tipo WORST FIT!!!"<<endl;
                     }
                 
                 }else{
@@ -555,6 +556,193 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
         cout<<"Error: No se pudo abrir el disco, es posible que no exista!!"<<endl;
     }
 }
+
+
+void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
+    char fitpartExtend = 0;
+    char unitpartExtend = 0;
+    string rutacompletaExtend = path + ruta;
+    int BytesExtend;
+    char buffer = '1';
+    if(fit != 0){
+        fitpartExtend = fit;
+
+    }else{
+        fitpartExtend = 'W';
+    }
+    if(unit != 0){
+        unitpartExtend = unit;
+        if(unitpartExtend == 'B'){
+            BytesExtend = size;
+        }else if(unitpartExtend == 'K'){
+            BytesExtend = size * 1024;
+        }else if (unitpartExtend=='M'){
+            BytesExtend = size*1024*1024;
+        }
+    }else{
+        BytesExtend = size * 1024;
+    }
+
+    FILE *fileDisk;
+    MBR mbrE;
+    if((fileDisk = fopen(rutacompletaExtend.c_str(), "rb+"))){
+        bool PartDisponible,ExisteExtendida = false;//Variables para verificar si hay particion disponible en disco y para verificar si hay una particion extendida
+        int ContadorPart = 0;
+        fseek(fileDisk,0,SEEK_SET);
+        fread(&mbrE,sizeof(MBR),1,fileDisk);
+        for(int i = 0; i < 4; i++){
+            if (mbrE.mbr_partition[i].part_type == 'E'){
+                ExisteExtendida = true;
+                break;
+            }
+        }
+        if(!ExisteExtendida){
+            for(int i = 0; i < 4; i++){
+                if(mbrE.mbr_partition[i].part_start == -1 || (mbrE.mbr_partition[i].part_status == '1' && mbrE.mbr_partition[i].part_size>=BytesExtend)){
+                    PartDisponible = true;
+                    ContadorPart = i;
+                    break;
+                }
+            }
+            if(PartDisponible){
+                int espacioUsado = 0;
+                for(int i = 0; i < 4; i++){
+                    if(mbrE.mbr_partition[i].part_status!='1'){
+                       espacioUsado += mbrE.mbr_partition[i].part_size;
+                    }
+                }
+                cout << "Espacio disponible para partición extendida: " << (mbrE.mbr_tamano - espacioUsado) <<" Bytes"<< endl;
+                cout << "Espacio necesario para partición extendida:  " << BytesExtend << " Bytes" << endl;
+                if((mbrE.mbr_tamano - espacioUsado) >= BytesExtend){
+                    if(!(ExisteParticion(rutacompletaExtend,name))){
+                        if(mbrE.disk_fit == 'F'){
+                            mbrE.mbr_partition[ContadorPart].part_type = 'E';
+                            mbrE.mbr_partition[ContadorPart].part_fit = fitpartExtend;
+                            if(ContadorPart == 0){
+                                mbrE.mbr_partition[ContadorPart].part_start = sizeof(mbrE);
+                            }else{
+                                mbrE.mbr_partition[ContadorPart].part_start =  mbrE.mbr_partition[ContadorPart-1].part_start + mbrE.mbr_partition[ContadorPart-1].part_size;
+                            }
+                            mbrE.mbr_partition[ContadorPart].part_size = BytesExtend;
+                            mbrE.mbr_partition[ContadorPart].part_status = '0';
+                            strcpy(mbrE.mbr_partition[ContadorPart].part_name,name.c_str());
+                            fseek(fileDisk,0,SEEK_SET);
+                            fwrite(&mbrE,sizeof(MBR),1,fileDisk);
+                            fseek(fileDisk, mbrE.mbr_partition[ContadorPart].part_start,SEEK_SET);
+                            EBR ebr;
+                            ebr.part_fit = fitpartExtend;
+                            ebr.part_status = '0';
+                            ebr.part_start = mbrE.mbr_partition[ContadorPart].part_start;
+                            ebr.part_size = 0;
+                            ebr.part_next = -1;
+                            strcpy(ebr.part_name, "");
+                            fwrite(&ebr,sizeof (EBR),1,fileDisk);
+                            for(int i = 0; i < (BytesExtend - (int)sizeof(EBR)); i++){
+                                fwrite(&buffer,1,1,fileDisk);
+                            }
+                            cout << "\nParticion EXTENDIDA creada con exito de tipo FIRST FIT"<< endl;
+                        }else if(mbrE.disk_fit == 'B'){
+                            int MejorPosicion = ContadorPart;
+                            for(int i = 0; i < 4; i++){
+                                if(mbrE.mbr_partition[i].part_start == -1 || (mbrE.mbr_partition[i].part_status == '1' && mbrE.mbr_partition[i].part_size>=BytesExtend)){
+                                    if(i != ContadorPart){
+                                        if(mbrE.mbr_partition[MejorPosicion].part_size > mbrE.mbr_partition[i].part_size){
+                                            MejorPosicion = i;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            mbrE.mbr_partition[MejorPosicion].part_type = 'E';
+                            mbrE.mbr_partition[MejorPosicion].part_fit = fitpartExtend;
+                            //start
+                            if(MejorPosicion == 0){
+                                mbrE.mbr_partition[MejorPosicion].part_start = sizeof(mbrE);
+                            }else{
+                                mbrE.mbr_partition[MejorPosicion].part_start =  mbrE.mbr_partition[MejorPosicion-1].part_start + mbrE.mbr_partition[MejorPosicion-1].part_size;
+                            }
+                            mbrE.mbr_partition[MejorPosicion].part_size = BytesExtend;
+                            mbrE.mbr_partition[MejorPosicion].part_status = '0';
+                            strcpy(mbrE.mbr_partition[MejorPosicion].part_name,name.c_str());
+                            //Se guarda de nuevo el MBR
+                            fseek(fileDisk,0,SEEK_SET);
+                            fwrite(&mbrE,sizeof(MBR),1,fileDisk);
+                            //Se guarda la particion extendida
+                            fseek(fileDisk, mbrE.mbr_partition[MejorPosicion].part_start,SEEK_SET);
+                            EBR ebr;
+                            ebr.part_fit = fitpartExtend;
+                            ebr.part_status = '0';
+                            ebr.part_start = mbrE.mbr_partition[MejorPosicion].part_start;
+                            ebr.part_size = 0;
+                            ebr.part_next = -1;
+                            strcpy(ebr.part_name, "");
+                            fwrite(&ebr,sizeof (EBR),1,fileDisk);
+                            for(int i = 0; i < (BytesExtend - (int)sizeof(EBR)); i++){
+                                fwrite(&buffer,1,1,fileDisk);
+                            }
+                            cout<< "\nParticion EXTENDIDA creada con exito de tipo BEST FIT"<< endl;
+                        }else if(mbrE.disk_fit == 'W'){
+                            int  PeorPosicion= ContadorPart;
+                            for(int i = 0; i < 4; i++){
+                                if(mbrE.mbr_partition[i].part_start == -1 || (mbrE.mbr_partition[i].part_status == '1' && mbrE.mbr_partition[i].part_size>=BytesExtend)){
+                                    if(i != ContadorPart){
+                                        if(mbrE.mbr_partition[PeorPosicion].part_size < mbrE.mbr_partition[i].part_size){
+                                            PeorPosicion = i;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            mbrE.mbr_partition[PeorPosicion].part_type = 'E';
+                            mbrE.mbr_partition[PeorPosicion].part_fit = fitpartExtend;
+                            //start
+                            if(PeorPosicion == 0){
+                                mbrE.mbr_partition[PeorPosicion].part_start = sizeof(mbrE);
+                            }else{
+                                mbrE.mbr_partition[PeorPosicion].part_start =  mbrE.mbr_partition[PeorPosicion-1].part_start + mbrE.mbr_partition[PeorPosicion-1].part_size;
+                            }
+                            mbrE.mbr_partition[PeorPosicion].part_size = BytesExtend;
+                            mbrE.mbr_partition[PeorPosicion].part_status = '0';
+                            strcpy(mbrE.mbr_partition[PeorPosicion].part_name,name.c_str());
+                            //Se guarda de nuevo el MBR
+                            fseek(fileDisk,0,SEEK_SET);
+                            fwrite(&mbrE,sizeof(MBR),1,fileDisk);
+                            //Se guarda la particion extendida
+                            fseek(fileDisk, mbrE.mbr_partition[PeorPosicion].part_start,SEEK_SET);
+                            EBR ebr;
+                            ebr.part_fit = fitpartExtend;
+                            ebr.part_status = '0';
+                            ebr.part_start = mbrE.mbr_partition[PeorPosicion].part_start;
+                            ebr.part_size = 0;
+                            ebr.part_next = -1;
+                            strcpy(ebr.part_name, "");
+                            fwrite(&ebr,sizeof (EBR),1,fileDisk);
+                            for(int i = 0; i < (BytesExtend - (int)sizeof(EBR)); i++){
+                                fwrite(&buffer,1,1,fileDisk);
+                            }
+                            cout<< "\nParticion EXTENDIDA creada con exito de tipo WORST FIT"<< endl;
+                        }
+                    }else{
+                        cout << "Error: La particion ya existe!!" << endl;
+                    }
+                }else{
+                    cout << "Error: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre" << endl;
+                }
+            }else{
+                cout << "Error: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear particion lógica!!" << endl;
+            }
+        }else{
+            cout << "Error: Ya existe una partición de tipo EXTENDIDA" << endl;
+        }
+    fclose(fileDisk);
+    }else{
+        cout << "Error: No se pudo abrir el disco, es posible que no exista!!" << endl;
+    }
+}
+
+
+
+
 int main(int argc, char const *argv[])
 {
     cout<<"********************************************"<<endl;

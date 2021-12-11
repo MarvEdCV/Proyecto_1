@@ -4,11 +4,3 @@
 
 // ! EXEC
 1. La ruta completa donde se encuentre el archivo SCRIPT tiene que estar en mayusculas por lo del casteo total de los comandos
-2. Si coloco varios RMDISK  a la vez solo hace el ultimo (revisar)***
-
-//ExisteParticion
-1.ARREGLAR LA EXISTENCIA DE LA PARTICION EXTENDIDA LINEA 282 METODO ExisteParticion 
-
-//FDISK
-1.ADD
-2. DELETE

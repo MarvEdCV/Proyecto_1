@@ -15,7 +15,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <fstream>
-
+#include <iostream>
+#include <fstream>
 using namespace std;
 using std::cout; using std::cin;
 using std::endl; using std::string;
@@ -24,7 +25,16 @@ using std::stringstream;
 //Metodos globales
 void ParticionPrimaria(int,char,string,char,string);
 void PaticionExtendida(int,char,string,char,string);
+void ParticionLogica(int,char,string,char,string);
 bool ExisteParticion(string,string);
+void MontarParticion(string,string);
+
+int FindLogic(string , string );
+int FindPrimariaYExtendida(string , string );
+void MontarParticion(string , string );
+int FindLetra(string , string );
+void ImprimirParticinesMontadas();
+int FindNumero(string ,string );
 //Variables globales
 //TODO:ARREGLAR PATH 
 string path="/home/eduardo/Escritorio/ArchivosVacas/Proyecto_1/Proyecto_1";
@@ -65,14 +75,14 @@ struct DiscoD{
 }
 Disk1;
 void CrearDisco(DiscoD op){
-cout<<"************************CREANDO DISCO*************************\n"<<endl;
+cout<<"\033[92m************************CREANDO DISCO*************************\033[0m\n"<<endl;
     string s = path + op.path;//url raiz + url de la entrada
     char sc[s.size() + 1];
     strcpy(sc, s.c_str());
     FILE *file=NULL;
     file=fopen(sc,"r"); //r= read = sera verdadero si el disco ya existe
     if(file!=NULL){
-        cout<<"Ya existe el disco"<<endl;
+        cout<<"\033[91mYa existe el disco\033[0m"<<endl;
         return;//error
     }
     //Tamaño para distintas unidades que se piden
@@ -106,11 +116,11 @@ cout<<"************************CREANDO DISCO*************************\n"<<endl;
         strcpy(mbr.mbr_partition[i].part_name,"");
     }
     
-    cout<<"Disco nuevo :: "<<op.path<<"\nFecha de creacion: "<<asctime(gmtime(&mbr.mbr_fecha_creacion))<<endl;
-    cout<<"Signature: "<<mbr.mbr_disk_signature <<endl;
-    cout<<"Tamaño: "<<mbr.mbr_tamano <<" Bytes"<<endl;
-    cout<<"Fit: " <<mbr.disk_fit <<endl;
-    cout<<"\n-------------DISCO CREADO--------------------\n"<<endl;
+    cout<<"\033[92mDisco nuevo :: \033[0m"<<op.path<<"\n \033[92mFecha de creacion: \033[0m"<<asctime(gmtime(&mbr.mbr_fecha_creacion))<<endl;
+    cout<<"\033[92mSignature: \033[0m"<<mbr.mbr_disk_signature <<endl;
+    cout<<"\033[92mTamaño: \033[0m"<<mbr.mbr_tamano <<" \033[92mBytes\033[0m"<<endl;
+    cout<<"\033[92mFit:\033[0m " <<mbr.disk_fit <<endl;
+    cout<<"\n\033[92m-------------DISCO CREADO--------------------\n\033[0m"<<endl;
     ///escritura del mbr
     fseek(file,0,SEEK_SET);
     fwrite(&mbr,sizeof(MBR),1,file);
@@ -169,10 +179,10 @@ void mkcarpetas(string entrada){
 void borrardisco(string ruta){//Metodo que recibe como parametro un path a eliminar.
     if(remove(ruta.c_str())==0) // Eliminamos el archivo
     {
-        cout<<"El archivo fue eliminado satisfactoriamente\n"<<endl;
+        cout<<"\033[92mEl archivo fue eliminado satisfactoriamente\033[0m\n"<<endl;
     }
     else{
-        cout<<"Error: No se pudo eliminar el archivo\n"<<endl;
+        cout<<"\033[91mError: No se pudo eliminar el archivo\033[0m\n"<<endl;
     }
 }
 
@@ -188,7 +198,7 @@ void EjecutarComando(char comando[200]){
         int aa = strncmp(comando,"PAUSE",5);
         if(aa==0){
             int pause;
-            cout<<"******       Script pausado!       ******\n"<<"******Presione Enter para continuar******\n";
+            cout<<"\033[91m******       Script pausado!       ******\n"<<"******Presione Enter para continuar******\033[0m\n";
             //pausamos
             pause = cin.get();
         }
@@ -214,7 +224,7 @@ void EjecutarComando(char comando[200]){
                             fit = true;
                         }else{
                             fiterror = 1;
-                            cout<<"Error: Esta tratando de ingresar un ajuste no permitido"<<endl;
+                            cout<<" \033[91mError: Esta tratando de ingresar un ajuste no permitido\033[0m"<<endl;
                         }    
                     }
                     else if(auxiliar[0]=="-UNIT"){//Asignamos la unidad al disco
@@ -223,14 +233,14 @@ void EjecutarComando(char comando[200]){
                             unit = true;
                         }else{
                             uniterror = 1;
-                            cout<<"Error: Esta tratando de ingresar una unidad no permitida para crear disco"<<endl;
+                            cout<<"\033[91mError: Esta tratando de ingresar una unidad no permitida para crear disco\033[0m"<<endl;
                         }
                         
                     }
                     else if(auxiliar[0] == "-SIZE"){//Asignamos el tamanio al disco
                         if(stof(auxiliar[1])<=0){
                             sizeerror = 1;
-                            cout<<"Error: El tamaño del disco no puede ser negativo o igual a cero"<<endl;
+                            cout<<"\033[91mError: El tamaño del disco no puede ser negativo o igual a cero\033[0m"<<endl;
                         }else{
                             Disk1.size = stof(auxiliar[1]);
                         }                        
@@ -243,8 +253,7 @@ void EjecutarComando(char comando[200]){
                     Disk1.unit ="M";
                 }
                 if(sizeerror==1 || uniterror==1 || fiterror==1){
-                    cout<<sizeerror<<"a"<<uniterror<<"b"<<fiterror<<"c"<<endl;
-                    cout<<"No se pudo crear el disco!!"<<endl;
+                    cout<<"\033[91mError: No se pudo crear el disco!!\033[0m"<<endl;
                 }else{
                     CrearDisco(Disk1);//Creamos disco
                 }                
@@ -257,7 +266,6 @@ void EjecutarComando(char comando[200]){
                     borrardisco(dir); 
                 }           
             }else if(lineSplit[0]=="FDISK"){
-                cout<<"entre a fdisk"<<endl;
                 int sizeerror,fiterror,uniterror,typeerror =0;
                 int sizepart;
                 char unitpart;
@@ -272,7 +280,7 @@ void EjecutarComando(char comando[200]){
                     if(auxiliar[0] == "-SIZE"){//Si el comando es el -path entonces entrara a esta condicional
                         if(stof(auxiliar[1])<=0){
                             sizeerror = 1;
-                            cout<<"Error: Esta tratando de ingresar una unidad no permitida para crear particion"<<endl;
+                            cout<<"\033[91mError: Esta tratando de ingresar una unidad no permitida para crear particion\033[0m"<<endl;
                         }else{
                             sizepart = stof(auxiliar[1]);
                         }
@@ -288,7 +296,7 @@ void EjecutarComando(char comando[200]){
                             defunit = true;
                         }else{
                             uniterror = 1;
-                            cout<<"Error: Esta tratando de ingresar una unidad no permitida para crear una particion"<<endl;
+                            cout<<"\033[91mError: Esta tratando de ingresar una unidad no permitida para crear una particion\033[0m"<<endl;
                         }    
                     }else if(auxiliar[0]=="-PATH"){
                         rutapart = auxiliar[1];    
@@ -304,7 +312,7 @@ void EjecutarComando(char comando[200]){
                             deftype = true;
                         }else{
                             typeerror = 1;
-                            cout<<"Error: Esta tratando de ingresar un tipo incompatible con las que se pueden crear particiones utiliza P,E o L"<<endl;
+                            cout<<"\033[91mError: Esta tratando de ingresar un tipo incompatible con las que se pueden crear particiones utiliza P,E o L\033[0m"<<endl;
                         } 
                     }else if(auxiliar[0]=="-FIT"){//Asignamos el fit a la particion
                         if(auxiliar[1]=="BF"){
@@ -318,7 +326,7 @@ void EjecutarComando(char comando[200]){
                             deffit = true;
                         }else{
                             fiterror = 1;
-                            cout<<"Error: Esta tratando de ingresar un ajuste no permitido para la particion"<<endl;
+                            cout<<"\033[91mError: Esta tratando de ingresar un ajuste no permitido para la particion\033[0m"<<endl;
                         }    
                     }else if(auxiliar[0]=="-NAME"){
                         namepart = auxiliar[1];                       
@@ -332,34 +340,67 @@ void EjecutarComando(char comando[200]){
                 }
                 if(!deftype || typepart=='P'){//Creamos particion primaria si no viene establecido en el comando el tipo de particion
                     //Creamos la particion primaria
-                    cout<<"-----Datos Partición a Crear-----"<<endl;
-                    cout<<"size: "<<sizepart<<endl;
-                    cout<<"unit: "<<unitpart<<endl;
-                    cout<<"ruta: "<<rutapart<<endl;
-                    cout<<"fit: "<<fitpart<<endl;
-                    cout<<"name: "<<namepart<<endl;
+                    cout<<"\033[93m-----Datos Partición PRIMARIA a Crear-----\033[0m"<<endl;
+                    cout<<"\033[93msize:\033[0m "<<sizepart<<endl;
+                    cout<<"\033[93munit:\033[0m "<<unitpart<<endl;
+                    cout<<"\033[93mruta:\033[0m "<<rutapart<<endl;
+                    cout<<"\033[93mfit:\033[0m "<<fitpart<<endl;
+                    cout<<"\033[93mname:\033[0m "<<namepart<<endl;
                     ParticionPrimaria(sizepart,unitpart,rutapart,fitpart,namepart);
 
                 }else if(deftype){
                     if(typepart=='E'){
+                    cout<<"\033[93m-----Datos Partición EXTENDIDA a Crear-----\033[0m"<<endl;
+                    cout<<"\033[93msize:\033[0m "<<sizepart<<endl;
+                    cout<<"\033[93munit:\033[0m "<<unitpart<<endl;
+                    cout<<"\033[93mruta:\033[0m "<<rutapart<<endl;
+                    cout<<"\033[93mfit:\033[0m "<<fitpart<<endl;
+                    cout<<"\033[93mname:\033[0m "<<namepart<<endl;
                         PaticionExtendida(sizepart,unitpart,rutapart,fitpart,namepart);
                     }else if(typepart=='L'){
-                        cout<<"Soy particion logica :D"<<endl;
+                    cout<<"\033[93m-----Datos Partición LOGICA a Crear-----\033[0m"<<endl;
+                    cout<<"\033[93msize:\033[0m "<<sizepart<<endl;
+                    cout<<"\033[93munit:\033[0m "<<unitpart<<endl;
+                    cout<<"\033[93mruta:\033[0m "<<rutapart<<endl;
+                    cout<<"\033[93mfit:\033[0m "<<fitpart<<endl;
+                    cout<<"\033[93mname:\033[0m "<<namepart<<endl;
+                        ParticionLogica(sizepart,unitpart,rutapart,fitpart,namepart);
                     }
                 }  
-            }//agregar defaults y tambien posibles errores.
+            }else if(lineSplit[0] == "MOUNT"){
+                string ruta, nombre;
+                vector<string> auxiliar;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
+                        ruta = auxiliar[1];
+                    }else if(auxiliar[0]=="-NAME"){
+                        nombre = auxiliar[1];
+                    }
+                }
+                MontarParticion(nombre,ruta);
+            }
     }
 }
-vector<string> lineas;//Vector que almacenara las lineas
 void leerscript(string ruta){//Metodo que recibe como parameto la ruta del script con comandos a ejecutar
-    FILE *script;
+    string linea;
+    char line[200];
+    ifstream file(ruta.c_str());
+    while (getline(file,linea)){
+        if(!linea.empty()){
+            strcpy(line,linea.c_str());
+            cout<<"\033[91mSCRIPT:\033[0m " << linea<<endl;
+            EjecutarComando(line);
+        }
+    }
+    /*FILE *script;
     if((script = fopen(ruta.c_str(),"r"))){//Si se encuentra el archivo y se puede abrir con exito
         char line[200]="";//declaramos un arreglo de char para poder almacenar linea individualmente 
         memset(line,0,sizeof(line));
         while(fgets(line,sizeof line,script)){//Mientras se lea una linea con salto de linea se ejecutara el while  
             if(line[0]!='\n'){//Obtenemos el dato de cada linea
                 cout <<"SCRIPT: "<< line << endl;//Imprimimos el comando
-                lineas.push_back(line);//Pusheamos la linea al arreglo
+                //lineas.push_back(line);//Pusheamos la linea al arreglo
                 EjecutarComando(line);//Ejecutamos el comando
             }
             memset(line,0,sizeof(line));
@@ -367,7 +408,7 @@ void leerscript(string ruta){//Metodo que recibe como parameto la ruta del scrip
         fclose(script);//Cerramos el archivo.
     }else{
         cout << "Error al abrir el SCRIPT" << endl;
-    }    
+    }    */
 }
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
 bool ExisteParticion(string ruta, string name){
@@ -425,7 +466,7 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
         }else if(unittmp == 'M'){
             sizetmp = size * 1024 * 1024;
         }else{
-            cout<<"Error: No esta ingresando una unidad permitida para la creacion de la particion primaria!!"<<endl;
+            cout<<"\033[91mError: No esta ingresando una unidad permitida para la creacion de la particion primaria!!\033[0m"<<endl;
         }
     }else{
         unittmp = 'K';
@@ -455,8 +496,8 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                     bytes += mbr.mbr_partition[i].part_size;//Sumamos el espacio disponible en las particiones NO ACTIVAS
                 }
             }
-            cout<<"Espacio Disponible: "<<mbr.mbr_tamano-bytes << " Bytes" <<endl;
-            cout<<"Espacio Necesario para particion primaria: "<<sizetmp<<" Bytes"<<endl;
+            cout<<"\033[96mEspacio Disponible: "<<mbr.mbr_tamano-bytes << " Bytes\033[0m" <<endl;
+            cout<<"\033[96mEspacio Necesario para particion primaria: "<<sizetmp<<" Bytes\033[0m"<<endl;
             if((mbr.mbr_tamano-bytes)>=sizetmp){//Verificamos si el tamanio es suficiente para poder aniadir la particion
                 if(!ExisteParticion(rutatmp,name)){
                     if(mbr.disk_fit=='F'){//First Fit
@@ -471,12 +512,12 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                         mbr.mbr_partition[contadorParticion].part_status = '0';
                         strcpy(mbr.mbr_partition[contadorParticion].part_name,name.c_str());
                         fseek(fileprimary,0,SEEK_SET);
-                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo masterboot
+                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo mbr
                         fseek(fileprimary,mbr.mbr_partition[contadorParticion].part_start,SEEK_SET);//Guardamos los bytes de la particion
                         for(int i=0; i < sizetmp; i++){
                             fwrite(&buffer,1,1,fileprimary);
                         }
-                        cout<<"\n Particion PRIMARIA creada con exito de tipo FIRST FIT!!!"<<endl;
+                        cout<<"\n \033[96mParticion PRIMARIA creada con exito de tipo FIRST FIT!!!\033[0m"<<endl;
                     }else if(mbr.disk_fit=='B'){//Best Fit
                         int best = contadorParticion;
                         for(int i = 0; i < 4; i++){
@@ -502,14 +543,13 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                         strcpy(mbr.mbr_partition[best].part_name,name.c_str());//Renombramos
                         //Guardamos en MBR new
                         fseek(fileprimary,0,SEEK_SET);
-                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo masterboot
+                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo mbr
                         fseek(fileprimary,mbr.mbr_partition[best].part_start,SEEK_SET);//Guardamos los bytes de la particion
                         for(int i=0; i < sizetmp; i++){
                             fwrite(&buffer,1,1,fileprimary);
                         }
-                        cout<<"\n Particion PRIMARIA creada con exito de tipo BEST FIT!!!"<<endl;
+                        cout<<"\n \033[96mParticion PRIMARIA creada con exito de tipo BEST FIT!!!\033[0m"<<endl;
                     }else if(mbr.disk_fit == 'W'){//WORST FIT
-                        cout<<"Particion worst fit"<<endl;
                         int  worst= contadorParticion;
                         for(int i = 0; i < 4; i++){
                             if(mbr.mbr_partition[i].part_start == -1 || (mbr.mbr_partition[i].part_status == '1' && mbr.mbr_partition[i].part_size>=sizetmp)){
@@ -534,26 +574,26 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                         strcpy(mbr.mbr_partition[worst].part_name,name.c_str());
                         //Guardamos en MBR nes
                         fseek(fileprimary,0,SEEK_SET);
-                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo masterboot
+                        fwrite(&mbr,sizeof(MBR),1,fileprimary);//Guardamos en el nuevo mbr
                         fseek(fileprimary,mbr.mbr_partition[worst].part_start,SEEK_SET);//Guardamos los bytes de la particion
                         for(int i = 0; i < sizetmp; i++){
                             fwrite(&buffer,1,1,fileprimary);
                         }
-                        cout <<"\n Particion PRIMARIA creada con exito de tipo WORST FIT!!!"<<endl;
+                        cout <<"\n \033[96mParticion PRIMARIA creada con exito de tipo WORST FIT!!!\033[0m"<<endl;
                     }
                 
                 }else{
-                    cout<<"Error: La particion ya existe!!"<<endl;
+                    cout<<"\033[91mError: La particion ya existe!!\033[0m"<<endl;
                 }  
             }else{
-                cout<<"Error: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre"<<endl;
+                cout<<"\033[91mError: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre\033[0m"<<endl;
             }
         }else{
-            cout<<"Error: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear otra particion primaria!!"<<endl;
+            cout<<"\033[91mError: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear otra particion primaria!!\033[0m"<<endl;
         }
         fclose(fileprimary);//Cerramos disco.
     }else{
-        cout<<"Error: No se pudo abrir el disco, es posible que no exista!!"<<endl;
+        cout<<"\033[91mError: No se pudo abrir el disco, es posible que no exista!!\033[0m"<<endl;
     }
 }
 
@@ -611,8 +651,8 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                        espacioUsado += mbrE.mbr_partition[i].part_size;
                     }
                 }
-                cout << "Espacio disponible para partición extendida: " << (mbrE.mbr_tamano - espacioUsado) <<" Bytes"<< endl;
-                cout << "Espacio necesario para partición extendida:  " << BytesExtend << " Bytes" << endl;
+                cout << "\033[96mEspacio disponible para partición extendida: " << (mbrE.mbr_tamano - espacioUsado) <<" Bytes\033[0m"<< endl;
+                cout << "\033[96mEspacio necesario para partición extendida:  " << BytesExtend << " Bytes\033[0m" << endl;
                 if((mbrE.mbr_tamano - espacioUsado) >= BytesExtend){
                     if(!(ExisteParticion(rutacompletaExtend,name))){
                         if(mbrE.disk_fit == 'F'){
@@ -640,7 +680,7 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             for(int i = 0; i < (BytesExtend - (int)sizeof(EBR)); i++){
                                 fwrite(&buffer,1,1,fileDisk);
                             }
-                            cout << "\nParticion EXTENDIDA creada con exito de tipo FIRST FIT"<< endl;
+                            cout << "\n \033[96mParticion EXTENDIDA creada con exito de tipo FIRST FIT\033[0m"<< endl;
                         }else if(mbrE.disk_fit == 'B'){
                             int MejorPosicion = ContadorPart;
                             for(int i = 0; i < 4; i++){
@@ -655,7 +695,6 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             }
                             mbrE.mbr_partition[MejorPosicion].part_type = 'E';
                             mbrE.mbr_partition[MejorPosicion].part_fit = fitpartExtend;
-                            //start
                             if(MejorPosicion == 0){
                                 mbrE.mbr_partition[MejorPosicion].part_start = sizeof(mbrE);
                             }else{
@@ -664,10 +703,8 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             mbrE.mbr_partition[MejorPosicion].part_size = BytesExtend;
                             mbrE.mbr_partition[MejorPosicion].part_status = '0';
                             strcpy(mbrE.mbr_partition[MejorPosicion].part_name,name.c_str());
-                            //Se guarda de nuevo el MBR
                             fseek(fileDisk,0,SEEK_SET);
                             fwrite(&mbrE,sizeof(MBR),1,fileDisk);
-                            //Se guarda la particion extendida
                             fseek(fileDisk, mbrE.mbr_partition[MejorPosicion].part_start,SEEK_SET);
                             EBR ebr;
                             ebr.part_fit = fitpartExtend;
@@ -680,7 +717,7 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             for(int i = 0; i < (BytesExtend - (int)sizeof(EBR)); i++){
                                 fwrite(&buffer,1,1,fileDisk);
                             }
-                            cout<< "\nParticion EXTENDIDA creada con exito de tipo BEST FIT"<< endl;
+                            cout<< "\n \033[96mParticion EXTENDIDA creada con exito de tipo BEST FIT\033[0m"<< endl;
                         }else if(mbrE.disk_fit == 'W'){
                             int  PeorPosicion= ContadorPart;
                             for(int i = 0; i < 4; i++){
@@ -695,7 +732,6 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             }
                             mbrE.mbr_partition[PeorPosicion].part_type = 'E';
                             mbrE.mbr_partition[PeorPosicion].part_fit = fitpartExtend;
-                            //start
                             if(PeorPosicion == 0){
                                 mbrE.mbr_partition[PeorPosicion].part_start = sizeof(mbrE);
                             }else{
@@ -704,10 +740,8 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             mbrE.mbr_partition[PeorPosicion].part_size = BytesExtend;
                             mbrE.mbr_partition[PeorPosicion].part_status = '0';
                             strcpy(mbrE.mbr_partition[PeorPosicion].part_name,name.c_str());
-                            //Se guarda de nuevo el MBR
                             fseek(fileDisk,0,SEEK_SET);
                             fwrite(&mbrE,sizeof(MBR),1,fileDisk);
-                            //Se guarda la particion extendida
                             fseek(fileDisk, mbrE.mbr_partition[PeorPosicion].part_start,SEEK_SET);
                             EBR ebr;
                             ebr.part_fit = fitpartExtend;
@@ -720,39 +754,298 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             for(int i = 0; i < (BytesExtend - (int)sizeof(EBR)); i++){
                                 fwrite(&buffer,1,1,fileDisk);
                             }
-                            cout<< "\nParticion EXTENDIDA creada con exito de tipo WORST FIT"<< endl;
+                            cout<< "\n \033[96mParticion EXTENDIDA creada con exito de tipo WORST FIT\033[0m"<< endl;
                         }
                     }else{
-                        cout << "Error: La particion ya existe!!" << endl;
+                        cout << "\033[91mError: La particion ya existe!!\033[0m" << endl;
                     }
                 }else{
-                    cout << "Error: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre" << endl;
+                    cout << "\033[91mError: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre\033[0m" << endl;
                 }
             }else{
-                cout << "Error: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear particion lógica!!" << endl;
+                cout << "\033[91mError: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear particion lógica!!\033[0m" << endl;
             }
         }else{
-            cout << "Error: Ya existe una partición de tipo EXTENDIDA" << endl;
+            cout << "\033[91mError: Ya existe una partición de tipo EXTENDIDA\033[0m" << endl;
         }
     fclose(fileDisk);
     }else{
-        cout << "Error: No se pudo abrir el disco, es posible que no exista!!" << endl;
+        cout << "\033[91mError: No se pudo abrir el disco, es posible que no exista!!\033[0m" << endl;
+    }
+}
+void ParticionLogica(int size,char unit,string ruta,char fit,string name){
+    char fitPartLogic = 0;
+    char UnitPartLogic = 0;
+    string Rutacompleta = path + ruta;
+    int tamLogic;
+    char buffer = '1';
+
+    if(fit != 0)
+        fitPartLogic = fit;
+    else
+        fitPartLogic = 'W';
+    if(unit != 0){
+        UnitPartLogic = unit;
+        if(UnitPartLogic == 'B'){
+            tamLogic = size;
+        }else if(UnitPartLogic == 'K'){
+            tamLogic = size * 1024;
+        }else if(UnitPartLogic=='M'){
+            tamLogic = size*1024*1024;
+        }
+    }else{
+        tamLogic = size * 1024;
+    }
+
+    FILE *filelogic;
+    MBR mbr;
+    if((filelogic = fopen(Rutacompleta.c_str(), "rb+"))){
+        int PosicionExtendida = -1;
+        fseek(filelogic,0,SEEK_SET);
+        fread(&mbr,sizeof(MBR),1,filelogic);
+        for(int i = 0; i < 4; i++){
+            if(mbr.mbr_partition[i].part_type == 'E'){
+                PosicionExtendida = i;
+                break;
+            }
+        }
+        if(!ExisteParticion(Rutacompleta,name)){
+            if(PosicionExtendida != -1){
+                EBR ebr;
+                fseek(filelogic,mbr.mbr_partition[PosicionExtendida].part_start,SEEK_SET);
+                fread(&ebr, sizeof(EBR),1,filelogic);
+                if(ebr.part_size == 0){
+                    if(mbr.mbr_partition[PosicionExtendida].part_size < tamLogic){
+                        cout << "\033[91mError: No hay suficiente espacio en la Extendida para esta partición lógica.\033[0m" << endl;
+                    }else{
+                        ebr.part_status = '0';
+                        ebr.part_fit = fitPartLogic;
+                        ebr.part_start = ftell(filelogic) - sizeof(EBR);
+                        ebr.part_size = tamLogic;
+                        ebr.part_next = -1;
+                        strcpy(ebr.part_name, name.c_str());
+                        fseek(filelogic, mbr.mbr_partition[PosicionExtendida].part_start ,SEEK_SET);
+                        fwrite(&ebr,sizeof(EBR),1,filelogic);
+                        cout << "\n\033[96m Particion LOGICA creada con exito!!!\033[0m "<< endl;
+                    }
+                }else{
+                    while((ebr.part_next != -1) && (ftell(filelogic) < (mbr.mbr_partition[PosicionExtendida].part_size + mbr.mbr_partition[PosicionExtendida].part_start))){
+                        fseek(filelogic,ebr.part_next,SEEK_SET);
+                        fread(&ebr,sizeof(EBR),1,filelogic);
+                    }
+                    int espacioNecesario = ebr.part_start + ebr.part_size + tamLogic;
+                    if(espacioNecesario <= (mbr.mbr_partition[PosicionExtendida].part_size + mbr.mbr_partition[PosicionExtendida].part_start)){
+                        ebr.part_next = ebr.part_start + ebr.part_size;
+                        fseek(filelogic,ftell(filelogic) - sizeof (EBR),SEEK_SET);
+                        fwrite(&ebr, sizeof(EBR),1 ,filelogic);
+                        fseek(filelogic,ebr.part_start + ebr.part_size, SEEK_SET);
+                        ebr.part_status = 0;
+                        ebr.part_fit = fitPartLogic;
+                        ebr.part_start = ftell(filelogic);
+                        ebr.part_size = tamLogic;
+                        ebr.part_next = -1;
+                        strcpy(ebr.part_name,name.c_str());
+                        fwrite(&ebr,sizeof(EBR),1,filelogic);
+                        cout << "\033[96m Particion LOGICA creada con exito \033[0m"<< endl;
+                    }else{
+                        cout << "\033[91mError: Espacio insuficiente, la lógica sobrepasa el espacio disponible!!\033[0m" << endl;
+                    }
+                }
+            }else{
+                cout << "\033[91mError: No se puede crear partición lógica sin extendida, crear partición EXTENDIDA antes.\033[0m" << endl;
+            }
+        }else{
+            cout << "\033[91mError: Ya existe una partición con el mismo nombre, cambielo e intente de nuevo.\033[0m" << endl;
+        }
+
+    fclose(filelogic);
+    }else{
+        cout << "\033[91mError: No se ha encontrado el disco, es probable que no exista.\033[0m" << endl;
+    }
+
+}
+
+
+struct nodoParticionMontada {
+    string path;
+    string name;
+    char letra;
+    int numero;
+};
+
+vector<nodoParticionMontada> arreglonodos;
+
+int FindLetra(string name, string path){
+    int letra = 'a';
+    if(arreglonodos.size()==0){//Si esta vacio
+        return letra;//retornamos a;
+    }else if(arreglonodos.size()!=0){//Si no esta vacio
+        for(int i = 0; i < arreglonodos.size();i++){
+            if((arreglonodos[i].path==path)&&(arreglonodos[i].name==name)){
+                return -1;
+            }else{
+                if(arreglonodos[i].path == path){
+                    return arreglonodos[i].letra;
+                }else if(letra <= arreglonodos[i].letra){
+                    letra++;
+                }
+            }
+        }
+    }
+    return letra; 
+}
+int FindNumero(string name,string path){
+    int numero = 1;
+    for(int i = 0; i < arreglonodos.size();i++){
+        if((arreglonodos[i].numero == numero) && arreglonodos[i].path == path){
+            numero++;
+        }
+    }
+    return numero;
+}
+
+void ImprimirParticinesMontadas(){
+    cout<<"\033[96m***** Particiones Montadas *****"<<endl;
+    cout<<"***    Nombre  |    ID       ***\033[0m"<<endl;
+    for(int i=0;i < arreglonodos.size();i++){
+        cout<<"***  "<<arreglonodos[i].name<<"  |  vd"<<arreglonodos[i].letra<<arreglonodos[i].numero<<endl;
+        cout<<"********************************"<<endl;
     }
 }
 
+void MontarParticion(string name, string pathr){
+    string pathcompleta = path + pathr;
+    int NumeroPrimariaOrExtendida = FindPrimariaYExtendida(pathcompleta,name);
+    if(NumeroPrimariaOrExtendida != -1){
+        FILE *filedisk;
+        if((filedisk = fopen(pathcompleta.c_str(),"rb+"))){
+            MBR mbr;
+            fseek(filedisk, 0, SEEK_SET);
+            fread(&mbr, sizeof(MBR),1,filedisk);
+            mbr.mbr_partition[NumeroPrimariaOrExtendida].part_status = '2';
+            fseek(filedisk,0,SEEK_SET);
+            fwrite(&mbr,sizeof(MBR),1,filedisk);
+            fclose(filedisk);
+            int letra = FindLetra(name,pathcompleta);
+            if(letra == -1){
+                cout << "\033[31mError: la particion ya esta montada.\033[0m" << endl;
+            }else{
+                int num = FindNumero(name,pathcompleta);
+                char LetraCasteada = static_cast<char>(letra);
+                string id = "vd";
+                id += LetraCasteada + to_string(num);
+                nodoParticionMontada newNodo;
+                newNodo.path = pathcompleta;
+                newNodo.name = name;
+                newNodo.letra = LetraCasteada;
+                newNodo.numero = num;
+                arreglonodos.push_back(newNodo);
+                cout << "\033[94mParticion montada con exito.\033[0m" << endl;
+                ImprimirParticinesMontadas();
+            }
+        }else{
+            cout << "\033[31mErro: no se encuentra el disco.\033[0m" << endl;
+        }
+    }else{//Posiblemente logica
+        int NumeroLogica = FindLogic(pathcompleta,name);
+        if(NumeroLogica != -1){
+            FILE *filedisk;
+            if((filedisk = fopen(pathcompleta.c_str(), "rb+"))){
+                EBR ebr;
+                fseek(filedisk, NumeroLogica, SEEK_SET);
+                fread(&ebr, sizeof(EBR),1,filedisk);
+                ebr.part_status = '2';
+                fseek(filedisk,NumeroLogica,SEEK_SET);
+                fwrite(&ebr,sizeof(EBR),1, filedisk);
+                fclose(filedisk);
+                int letra = FindLetra(name,pathcompleta);
+                if(letra == -1){
+                    cout << "\033[31mERROR: La particion ya esta montada.\033[0m" << endl;
+                }else{
+                    int num = FindNumero(name,pathcompleta);
+                    char LetraCasteada = static_cast<char>(letra);
+                    string id = "vd";
+                    id += LetraCasteada + to_string(num);
+                    nodoParticionMontada newNodo;
+                    newNodo.path = pathcompleta;
+                    newNodo.name = name;
+                    newNodo.letra = LetraCasteada;
+                    newNodo.numero = num;
+                    arreglonodos.push_back(newNodo);
+                    cout << "\033[94mParticion montada con exito.\033[0m" << endl;
+                    ImprimirParticinesMontadas();
+                }
+            }else{
+                cout << "\033[31mERROR: no se encuentra el disco.\033[0m" << endl;
+            }
+        }else{
+            cout << "\033[31mERROR: no se encuentra la particion a montar.\033[0m" << endl;
+        }
+    }
+}
+
+int FindPrimariaYExtendida(string direccion, string nombre){
+    string auxPath = direccion;
+    string auxName = nombre;
+    FILE *filedisk;
+    if((filedisk = fopen(auxPath.c_str(),"rb+"))){
+        MBR mbr;
+        fseek(filedisk,0,SEEK_SET);
+        fread(&mbr,sizeof(MBR),1,filedisk);
+        for(int i = 0; i < 4; i++){
+            if(mbr.mbr_partition[i].part_status != '1'){
+                if(strcmp(mbr.mbr_partition[i].part_name,auxName.c_str()) == 0){
+                    return i;
+                }
+            }
+        }
+
+    }
+    return -1;
+}
+
+
+int FindLogic(string direccion, string nombre){
+    string auxPath = direccion;
+    string auxName = nombre;
+    FILE *filedisk;
+    if((filedisk = fopen(auxPath.c_str(),"rb+"))){
+        int extendida = -1;
+        MBR mbr;
+        fseek(filedisk,0,SEEK_SET);
+        fread(&mbr,sizeof(MBR),1,filedisk);
+        for(int i = 0; i < 4; i++){
+            if(mbr.mbr_partition[i].part_type == 'E'){
+                extendida = i;
+                break;
+            }
+        }
+        if(extendida != -1){
+            EBR ebr;
+            fseek(filedisk, mbr.mbr_partition[extendida].part_start,SEEK_SET);
+            while(fread(&ebr,sizeof(EBR),1,filedisk)!=0 && (ftell(filedisk) < mbr.mbr_partition[extendida].part_start + mbr.mbr_partition[extendida].part_size)){
+                if(strcmp(ebr.part_name, auxName.c_str()) == 0){
+                    return (ftell(filedisk) - sizeof(EBR));
+                }
+            }
+        }
+        fclose(filedisk);
+    }
+    return -1;
+}
 
 
 
 int main(int argc, char const *argv[])
 {
-    cout<<"********************************************"<<endl;
+    cout<<"\033[92m********************************************"<<endl;
     cout<<"**          HARD DISK SIMULATION          **"<<endl;
     cout<<"**               201905554                **"<<endl;
-    cout<<"******************************************** \n"<<endl;
+    cout<<"******************************************** \033[0m\n"<<endl;
     char Linea_Comando[200];
     
     while((string)Linea_Comando!="EXIT"){
-        cout<<"Command :: ";
+        cout<<"\033[96mCommand :: \033[0m";
         cin.getline(Linea_Comando,200,'\n');
         string tmp=CastearMayuscula(Linea_Comando);//Casteamos a mayuscula toda la linea para evitarnos problemas del case-insensitive.
         vector<string> ls= SplitSpace(tmp);

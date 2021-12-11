@@ -50,7 +50,6 @@ struct Particion
     int part_size;
     char part_name[16];
 };
-
 struct MBR
 {
     int mbr_tamano;
@@ -67,7 +66,6 @@ struct EBR{
     int part_next; 
     char part_name[16]; 
 };
-
 struct DiscoD{ 
 	string path="";
 	int size;
@@ -133,7 +131,6 @@ cout<<"\033[92m************************CREANDO DISCO*************************\03
     fwrite(&mbr,sizeof(MBR),1,file);
     fclose(file);
 }
-
 //FUNCIONES Y METODOS A UTILIZAR 
 //Funcion para transformar la entrada a letra mayuscula y asi poder hacer una aplicacion case-insensitive
 string CastearMayuscula(char cad1[]){
@@ -192,7 +189,6 @@ void borrardisco(string ruta){//Metodo que recibe como parametro un path a elimi
         cout<<"\033[91mError: No se pudo eliminar el archivo\033[0m\n"<<endl;
     }
 }
-
 void EjecutarComando(char comando[200]){
     if(comando[0]!='#'){//Validacion por si viene un comentario antes de una instruccion o comando
         for(int i=0;i<=200;i++){
@@ -396,6 +392,21 @@ void EjecutarComando(char comando[200]){
                     }
                 }
                 DesmontarParticion(id);
+            }else if(lineSplit[0] == "MKFS"){
+                string id;
+                vector<string> auxiliar;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    if(auxiliar[0] == "-ID"){//Si el comando es el -path entonces entrara a esta condicional
+                        
+                    }else if(auxiliar[0] == "-TYPE"){//Si el comando es el -path entonces entrara a esta condicional
+                        
+                    }else if(auxiliar[0] == "-FS"){//Si el comando es el -path entonces entrara a esta condicional
+                        
+                    }else if(auxiliar[0] == "-FS"){//Si el comando es el -path entonces entrara a esta condicional
+                        
+                    }
+                }
             }
     }
 }
@@ -461,7 +472,6 @@ bool ExisteParticion(string ruta, string name){
     fclose(filiPart);
     return false;
 }
-
 //FDISK MANEJO DE PARTICIONES
 void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
     char fittmp = 0;
@@ -613,8 +623,6 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
         cout<<"\033[91mError: No se pudo abrir el disco, es posible que no exista!!\033[0m"<<endl;
     }
 }
-
-
 void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
     char fitpartExtend = 0;
     char unitpartExtend = 0;
@@ -881,9 +889,7 @@ void ParticionLogica(int size,char unit,string ruta,char fit,string name){
     }
 
 }
-
 vector<nodoParticionMontada> arreglonodos;
-
 int FindLetra(string name, string path){
     int letra = 'a';
     if(arreglonodos.size()==0){//Si esta vacio
@@ -1043,15 +1049,16 @@ int FindLogic(string direccion, string nombre){
 }
 
 void DesmontarParticion(string id){
+    string idtmp;
     bool flag=false;
     for(int i=0;i < arreglonodos.size();i++){
         string vd="VD";
         string letra="";
         letra = toupper(arreglonodos[i].letra);
         string numero = to_string(arreglonodos[i].numero);
-        string idtmp = vd+letra+numero;
+        idtmp = vd+letra+numero;
         if(idtmp==id){ 
-            arreglonodos.erase(arreglonodos.begin()+ i+1);  
+            arreglonodos.erase(arreglonodos.begin()+ i);  
             cout<<"\033[92m Partición desmontada con éxito. \033[0m"<<endl;
             ImprimirParticinesMontadas();
             flag = true;

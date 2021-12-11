@@ -12,6 +12,18 @@ pause
 rmdisk -path~:~/home/a/disco.disk
 rmdisk -path~:~/home/user/Disco2.disk
 
+
 #Disco y particion pirmaria
-Mkdisk  -path~:~/home/Disco2.disk -Unit~:~K -size~:~3000
-fdisk -path~:~/home/Disco2.disk -size~:~300 -unit~:~k -name~:~Part1
+Mkdisk  -path~:~/Disco3.disk -Unit~:~K -size~:~3000
+Mkdisk  -path~:~/Disco2.disk -Unit~:~K -size~:~3000
+fdisk -path~:~/Disco3.disk -size~:~500 -unit~:~k -name~:~Part1P
+fdisk -path~:~/Disco2.disk -size~:~500 -unit~:~k -name~:~Part1P
+fdisk -path~:~/Disco3.disk -size~:~500 -unit~:~k -type~:~E -name~:~Part1E
+
+mount -path~:~/Disco3.disk -name~:~Part1P
+mount -path~:~/Disco2.disk -name~:~Part1P
+mount -path~:~/Disco3.disk -name~:~Part1E
+
+
+fdisk -path~:~/Disco3.disk -size~:~250 -unit~:~k -type~:~L -name~:~Part1L 
+rmdisk -path~:~/home/user/Disco2.disk

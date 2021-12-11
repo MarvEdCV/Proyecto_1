@@ -23,7 +23,8 @@ fdisk -path~:~/Disco3.disk -size~:~500 -unit~:~k -type~:~E -name~:~Part1E
 mount -path~:~/Disco3.disk -name~:~Part1P
 mount -path~:~/Disco2.disk -name~:~Part1P
 mount -path~:~/Disco3.disk -name~:~Part1E
-
+unMount -id~:~vda1
+unMount -id~:~vda2
 
 fdisk -path~:~/Disco3.disk -size~:~250 -unit~:~k -type~:~L -name~:~Part1L 
 rmdisk -path~:~/home/user/Disco2.disk

@@ -35,6 +35,7 @@ void MontarParticion(string , string );
 int FindLetra(string , string );
 void ImprimirParticinesMontadas();
 int FindNumero(string ,string );
+void DesmontarParticion(string);
 //Variables globales
 //TODO:ARREGLAR PATH 
 string path="/home/eduardo/Escritorio/ArchivosVacas/Proyecto_1/Proyecto_1";
@@ -74,6 +75,12 @@ struct DiscoD{
     char fit='F';//Primer ajuste como default.
 }
 Disk1;
+struct nodoParticionMontada {
+    string path;
+    string name;
+    char letra;
+    int numero;
+};
 void CrearDisco(DiscoD op){
 cout<<"\033[92m************************CREANDO DISCO*************************\033[0m\n"<<endl;
     string s = path + op.path;//url raiz + url de la entrada
@@ -379,6 +386,16 @@ void EjecutarComando(char comando[200]){
                     }
                 }
                 MontarParticion(nombre,ruta);
+            }else if(lineSplit[0] == "UNMOUNT"){
+                string id;
+                vector<string> auxiliar;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    if(auxiliar[0] == "-ID"){//Si el comando es el -path entonces entrara a esta condicional
+                        id = auxiliar[1];
+                    }
+                }
+                DesmontarParticion(id);
             }
     }
 }
@@ -865,14 +882,6 @@ void ParticionLogica(int size,char unit,string ruta,char fit,string name){
 
 }
 
-
-struct nodoParticionMontada {
-    string path;
-    string name;
-    char letra;
-    int numero;
-};
-
 vector<nodoParticionMontada> arreglonodos;
 
 int FindLetra(string name, string path){
@@ -1004,7 +1013,6 @@ int FindPrimariaYExtendida(string direccion, string nombre){
     return -1;
 }
 
-
 int FindLogic(string direccion, string nombre){
     string auxPath = direccion;
     string auxName = nombre;
@@ -1034,6 +1042,27 @@ int FindLogic(string direccion, string nombre){
     return -1;
 }
 
+void DesmontarParticion(string id){
+    bool flag=false;
+    for(int i=0;i < arreglonodos.size();i++){
+        string vd="VD";
+        string letra="";
+        letra = toupper(arreglonodos[i].letra);
+        string numero = to_string(arreglonodos[i].numero);
+        string idtmp = vd+letra+numero;
+        if(idtmp==id){ 
+            arreglonodos.erase(arreglonodos.begin()+ i+1);  
+            cout<<"\033[92m Partición desmontada con éxito. \033[0m"<<endl;
+            ImprimirParticinesMontadas();
+            flag = true;
+            break;    
+        }
+    }
+    if(!flag){
+        cout<<"\033[91m Error: No se encontro la partición que desea desmontar!!!\n Las particiones montadas son: \033[0m"<<endl;
+        ImprimirParticinesMontadas();
+    }
+}
 
 
 int main(int argc, char const *argv[])

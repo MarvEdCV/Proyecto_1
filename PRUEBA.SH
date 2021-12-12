@@ -28,3 +28,4 @@ unMount -id~:~vda2
 
 fdisk -path~:~/Disco3.disk -size~:~250 -unit~:~k -type~:~L -name~:~Part1L 
 rmdisk -path~:~/home/user/Disco2.disk
+mkfs -id~:~vda1 -fs~:~3fd

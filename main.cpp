@@ -36,6 +36,9 @@ int FindLetra(string , string );
 void ImprimirParticinesMontadas();
 int FindNumero(string ,string );
 void DesmontarParticion(string);
+void FormatEXT2(int,int,string);
+void FormatEXT3(int,int,string);
+void ComandoMKFS(string,string,int);
 //Variables globales
 //TODO:ARREGLAR PATH 
 string path="/home/eduardo/Escritorio/ArchivosVacas/Proyecto_1/Proyecto_1";
@@ -78,6 +81,25 @@ struct nodoParticionMontada {
     string name;
     char letra;
     int numero;
+};
+struct SuperBloque{
+    int s_filesystem_type; //Guarda el numero que identifica al sistea de archivos utilizado
+    int s_inodes_count; //Guarda el numero total de inodos
+    int s_blocks_count; //Guarda el numero total de bloques
+    int s_free_blocks_count; //Contiene el numero de bloques libres
+    int s_free_inodes_count; //Contiene el numero inodos libres
+    time_t s_mtime; //Ultima fecha en el que el sistema fue montado
+    time_t s_umtime; //Ultima fecha en que el sistema fue desmontado
+    int s_mnt_count; //Indica cuantas veces se ha montado el sistema
+    int s_magic; //Valor que identifica al sistema de archivos 0xEF53
+    int s_inode_size; //Tamano del inodo
+    int s_block_size; //Tamano del bloque
+    int s_first_ino; //Primer inodo libre
+    int s_first_blo; //Primero bloque libre
+    int s_bm_inode_start; //Guardara el inicio del bitmap de inodos
+    int s_bm_block_start; //Guardara el inicio del bitmap de bloques
+    int s_inode_start; //Guarada el inicio de la tabla de inodos
+    int s_block_start; //Guardara el inicio de la tabla de bloques
 };
 void CrearDisco(DiscoD op){
 cout<<"\033[92m************************CREANDO DISCO*************************\033[0m\n"<<endl;
@@ -394,19 +416,36 @@ void EjecutarComando(char comando[200]){
                 DesmontarParticion(id);
             }else if(lineSplit[0] == "MKFS"){
                 string id;
+                bool flag = true;
+                string type = "FULL";
+                int fs=2;
                 vector<string> auxiliar;
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
-                    if(auxiliar[0] == "-ID"){//Si el comando es el -path entonces entrara a esta condicional
-                        
-                    }else if(auxiliar[0] == "-TYPE"){//Si el comando es el -path entonces entrara a esta condicional
-                        
-                    }else if(auxiliar[0] == "-FS"){//Si el comando es el -path entonces entrara a esta condicional
-                        
-                    }else if(auxiliar[0] == "-FS"){//Si el comando es el -path entonces entrara a esta condicional
-                        
+                    if(auxiliar[0] == "-ID"){
+                        id = auxiliar[1];
+                    }else if(auxiliar[0] == "-TYPE"){
+                        if(auxiliar[1]=="FULL" || auxiliar[1] == "FAST"){
+                            type = auxiliar[1];
+                        }else{
+                            flag = false;
+                            cout<<"\033[91mError:El tipo ingresado es invalido\033[0m"<<endl;
+                        }                        
+                    }else if(auxiliar[0] == "-FS"){
+                        auto arreglochar = auxiliar[1].c_str();
+                        if((arreglochar[0]=='2')&&(arreglochar[1]=='F')&&(arreglochar[2]=='S')){
+                            fs=2;
+                        }else if((arreglochar[0]=='3')&&(arreglochar[1]=='F')&&(arreglochar[2]=='S')){
+                            fs=3;
+                        }else{
+                            flag = false;
+                            cout<<"\033[91mError:El fs ingresado es invalido\033[0m"<<endl;
+                        }
                     }
                 }
+                if(flag){
+                    ComandoMKFS(id,type,fs);
+                }                
             }
     }
 }
@@ -1071,6 +1110,47 @@ void DesmontarParticion(string id){
     }
 }
 
+void FormatEXT2(int inicio ,int tam,string path){
+    cout<<"FORMATEO EXT2"<<endl;
+}
+void FormatEXT3(int inicio,int tam ,string path){
+    cout<<"FORMATEO EXT3"<<endl;
+}
+void ComandoMKFS(string id,string type,int fs){
+    string idtmp;
+    bool flag=false;
+    for(int i=0;i < arreglonodos.size();i++){
+        string vd="VD";
+        string letra="";
+        letra = toupper(arreglonodos[i].letra);
+        string numero = to_string(arreglonodos[i].numero);
+        idtmp = vd+letra+numero;
+        if(idtmp==id){ 
+            int index = FindPrimariaYExtendida(arreglonodos[i].path,arreglonodos[i].name);
+                if(index != -1){
+                    MBR masterboot;
+                    FILE *fp = fopen(arreglonodos[i].path.c_str(),"rb+");
+                    fread(&masterboot,sizeof(MBR),1,fp);
+                    int inicio = masterboot.mbr_partition[index].part_start;
+                    int tamano = masterboot.mbr_partition[index].part_size;
+                    if(fs == 2){
+                        FormatEXT2(inicio,tamano,arreglonodos[i].path);
+                    }
+                    else if(fs==3){
+                        FormatEXT3(inicio,tamano,arreglonodos[i].path);
+                    }
+                    fclose(fp);
+                }else{
+                    index = FindLogic(arreglonodos[i].path,arreglonodos[i].name);
+                }            
+            flag = true;
+            break;    
+        }
+    }
+    if(!flag){
+        cout<<"\033[91m Error: No se encontro la partición montada con ese id!!!\n Las particiones montadas son: \033[0m"<<endl;
+    }
+}
 
 int main(int argc, char const *argv[])
 {

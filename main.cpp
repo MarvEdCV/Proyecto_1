@@ -35,16 +35,34 @@ int FindPrimariaYExtendida(string , string );
 void MontarParticion(string , string );
 int FindLetra(string , string );
 void ImprimirParticinesMontadas();
+
 int FindNumero(string ,string );
 void DesmontarParticion(string);
 void FormatEXT2(int,int,string);
 void FormatEXT3(int,int,string);
 void ComandoMKFS(string,string,int);
+int VerificarLogin(string,string,string,string);
+int FindGrupo(string);
+int VerificarParametros(string,string,string);
+char ObtenerFit(string,string);
+void login(string,string,string);
+vector<string> Mkfsids;
+
 //Variables globales
 //TODO:ARREGLAR PATH 
 string path="/home/eduardo/Escritorio/ArchivosVacas/Proyecto_1/Proyecto_1";
+bool SesionActiva=false;
 
 //ESTRUCTURAS GENERALES
+struct ActiveSession{
+    int IDU;
+    int IDG;
+    int PosicionInicialSB;
+    int PosicionInicialJournal;
+    int FS;
+    char fit;
+    string direccion;
+};
 struct Particion
 {
     char part_status;
@@ -186,6 +204,7 @@ cout<<"\033[92m************************CREANDO DISCO*************************\03
     fclose(file);
 }
 //FUNCIONES Y METODOS A UTILIZAR 
+ActiveSession SesionActual;
 //Funcion para transformar la entrada a letra mayuscula y asi poder hacer una aplicacion case-insensitive
 string CastearMayuscula(char cad1[]){
     int i;
@@ -244,6 +263,8 @@ void borrardisco(string ruta){//Metodo que recibe como parametro un path a elimi
     }
 }
 void EjecutarComando(char comando[200]){
+    char temporal[200];
+    strcpy(temporal,comando);
     if(comando[0]!='#'){//Validacion por si viene un comentario antes de una instruccion o comando
         for(int i=0;i<=200;i++){
             if(comando[i]=='#'){//validacion por si viene un comentario al final de la linea
@@ -260,6 +281,7 @@ void EjecutarComando(char comando[200]){
             pause = cin.get();
         }
         vector<string>lineSplit = SplitSpace(comandoCasteado);//Spliteamos por espacios
+        vector<string>lineSplitSinCasteo = SplitSpace(temporal);
             if(lineSplit[0]=="MKDISK"){
                 int sizeerror,fiterror,uniterror =0;
                 bool unit,fit = false;//Variables booleanas que se estableceran por defecto si no se declaran en el comando si son false se pondran en automatico por defecto segun enunciado
@@ -477,6 +499,30 @@ void EjecutarComando(char comando[200]){
                 }
                 if(flag){
                     ComandoMKFS(id,type,fs);
+                }                
+            }else if(lineSplit[0] == "LOGIN"){
+                string id,usuario,contrasenia;
+                bool flag = true;
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear;
+                if(lineSplit.size()!=4){
+                    flag=false;
+                }
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-USR"){
+                        usuario = auxiliarSinCastear[1];
+                    }else if(auxiliar[0] == "-PWD"){
+                        contrasenia = auxiliarSinCastear[1];
+                    }else if(auxiliar[0] == "-ID"){
+                        id = auxiliar[1];
+                    }
+                }
+                if(flag){
+                    login(usuario,contrasenia,id);
+                }else{
+                   cout<<"\033[91mError: Error en el comando \033[0m"<<endl; 
                 }                
             }
     }
@@ -1241,11 +1287,10 @@ void FormatEXT2(int inicio ,int tamano,string direccion){
     strcpy(archivo.b_content,"1,G,root\n1,U,root,root,123\n");
     fseek(fileDisk,SBlock.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas)),SEEK_SET);
     fwrite(&archivo,sizeof(Bloque_Archivos),1,fileDisk);
-
+    
     cout << "\033[96mFormateo de tipo EXT2 realizada con éxito\033[0m" << endl;
     fclose(fileDisk);//Cerramos el disco
 }
-
 
 void FormatEXT3(int inicio,int tamano ,string direccion){
     double n = 1+(tamano - static_cast<int>(sizeof(SuperBloque))-1)/(4 + static_cast<int>(sizeof(Journaling))+static_cast<int>(sizeof(Tabla_Inodos)) +3*static_cast<int>(sizeof(Bloque_Carpetas)));
@@ -1380,9 +1425,11 @@ void ComandoMKFS(string id,string type,int fs){
                     int tamano = mbr.mbr_partition[contador].part_size;
                     if(fs == 2){
                         FormatEXT2(inicio,tamano,arreglonodos[i].path);
+                        Mkfsids.push_back(id);
                     }
                     else if(fs==3){
                         FormatEXT3(inicio,tamano,arreglonodos[i].path);
+                        Mkfsids.push_back(id);
                     }
                     fclose(fileDisk);
                 }else{
@@ -1397,6 +1444,236 @@ void ComandoMKFS(string id,string type,int fs){
     }
 }
 
+/*
+Funciones y metodos para el manejo del login y todas sus validaciones.
+*/
+int FindGrupo(string grupo){
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+
+    char arreglochar[400] = "\0";
+    SuperBloque SB;
+    Tabla_Inodos inodo;
+
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    //Leemos el inodo del archivo users.txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);
+    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    for(int i = 0; i < 15; i++){
+        if(inodo.i_block[i] != -1){
+            Bloque_Archivos archivo;
+            fseek(FileDisk,SB.s_block_start,SEEK_SET);
+            for(int j = 0; j <= inodo.i_block[i]; j++){
+                fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            }
+            strcat(arreglochar,archivo.b_content);
+        }
+    }
+
+    fclose(FileDisk);
+
+    char *finalcadena;
+    char *llave = strtok_r(arreglochar,"\n",&finalcadena);
+    while(llave != nullptr){
+        char id[2];
+        char tipo[2];
+        char group[12];
+        char *Finalllave;
+        char *llavei = strtok_r(llave,",",&Finalllave);
+        strcpy(id,llavei);
+        if(strcmp(id,"0") != 0){//Verificar que no sea un U/G eliminado
+            llavei = strtok_r(nullptr,",",&Finalllave);
+            strcpy(tipo,llavei);
+            if(strcmp(tipo,"G") == 0){
+                strcpy(group,Finalllave);
+                if(strcmp(group,grupo.c_str()) == 0)
+                    return atoi(id);
+            }
+        }
+        llave = strtok_r(nullptr,"\n",&finalcadena);
+    }
+
+    return -1;
+}
+
+int VerificarParametros(string user,string password,string direccion){
+    FILE *FileDisk = fopen(direccion.c_str(),"rb+");
+
+    char arreglochar[400] = "\0";
+    SuperBloque SB;
+    Tabla_Inodos inodo;
+
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    //Leemos el inodo del archivo users.txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    for(int i = 0; i < 15; i++){
+        if(inodo.i_block[i] != -1){
+            Bloque_Archivos archivo;
+            fseek(FileDisk,SB.s_block_start,SEEK_SET);
+            for(int j = 0; j <= inodo.i_block[i]; j++){
+                fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            }
+            strcat(arreglochar,archivo.b_content);
+        }
+    }
+
+    fclose(FileDisk);
+
+    char *finalcadena;
+    char *llave = strtok_r(arreglochar,"\n",&finalcadena);
+    while(llave != nullptr){
+        char id[2];
+        char tipo[2];
+        string group;
+        char user_[12];
+        char password_[12];
+        char *Finalllave;
+        char *llavei = strtok_r(llave,",",&Finalllave);
+        strcpy(id,llavei);
+        if(strcmp(id,"0") != 0){//Verificar que no sea un U/G eliminado
+            llavei=strtok_r(nullptr,",",&Finalllave);
+            strcpy(tipo,llavei);
+            if(strcmp(tipo,"U") == 0){
+                llavei = strtok_r(nullptr,",",&Finalllave);
+                group = llavei;
+                llavei = strtok_r(nullptr,",",&Finalllave);
+                strcpy(user_,llavei);
+                llavei = strtok_r(nullptr,",",&Finalllave);
+                strcpy(password_,llavei);
+                if(strcmp(user_,user.c_str()) == 0){
+                    if(strcmp(password_,password.c_str()) == 0){
+                        SesionActual.direccion = direccion;
+                        SesionActual.IDU = atoi(id);
+                        SesionActual.IDG = FindGrupo(group);
+                        return 1;
+                    }else{
+                        return 2;
+                    }
+                        
+                }
+            }
+        }
+        llave = strtok_r(nullptr,"\n",&finalcadena);
+    }
+
+    return 0;
+}
+
+char ObtenerFit(string path,string nombre){
+    FILE *FileDisk;
+    if((FileDisk = fopen(path.c_str(),"rb+"))){
+        int numeroExtendida = -1;
+        MBR mbr;
+        fseek(FileDisk,0,SEEK_SET);
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        for(int i = 0; i < 4; i++){
+            if(mbr.mbr_partition[i].part_type == 'E'){
+                numeroExtendida = i;
+                break;
+            }
+        }
+        if(numeroExtendida != -1){
+            EBR ebr;
+            fseek(FileDisk, mbr.mbr_partition[numeroExtendida].part_start,SEEK_SET);
+            while(fread(&ebr,sizeof(EBR),1,FileDisk)!=0 && (ftell(FileDisk) < mbr.mbr_partition[numeroExtendida].part_start + mbr.mbr_partition[numeroExtendida].part_size)){
+                if(strcmp(ebr.part_name, nombre.c_str()) == 0){
+                    return ebr.part_fit;
+                }
+            }
+        }
+        fclose(FileDisk);
+    }
+    return -1;
+}
+
+
+int VerificarLogin(string path,string nombre,string user,string password){
+    int contador = FindPrimariaYExtendida(path,nombre);
+    if(contador != -1){
+        MBR mbr;
+        SuperBloque SB;
+        Tabla_Inodos inodo;
+        FILE *FileDisk = fopen(path.c_str(),"rb+");
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        fseek(FileDisk,mbr.mbr_partition[contador].part_start,SEEK_SET);
+        fread(&SB,sizeof(SuperBloque),1,FileDisk);
+        fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+        fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+        inodo.i_atime = time(nullptr);
+        fwrite(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        fclose(FileDisk);
+        SesionActual.PosicionInicialSB = mbr.mbr_partition[contador].part_start;
+        SesionActual.fit = mbr.mbr_partition[contador].part_fit;
+        SesionActual.PosicionInicialJournal = mbr.mbr_partition[contador].part_start + static_cast<int>(sizeof(SuperBloque));
+        SesionActual.FS = SB.s_filesystem_type;
+        return VerificarParametros(user,password, path);
+    }else{
+        contador = FindLogic(path, nombre);
+        if(contador != -1){
+            SuperBloque SB;
+            Tabla_Inodos inodo;
+            FILE *FileDisk = fopen(path.c_str(),"rb+");
+            fseek(FileDisk,contador + static_cast<int>(sizeof(EBR)),SEEK_SET);
+            fread(&SB,sizeof(SuperBloque),1,FileDisk);
+            fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+            fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+            inodo.i_atime = time(nullptr);
+            fwrite(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            fclose(FileDisk);
+            SesionActual.PosicionInicialSB = contador + static_cast<int>(sizeof(EBR));
+            SesionActual.fit = ObtenerFit(path,nombre);
+            return VerificarParametros(user,password,path);
+        }
+    }
+    return 0;
+}
+
+void login(string usuario,string contrasena,string id){
+    string idtmp;
+    bool flag=false;
+    bool mkfstrue=false;
+    for(int i=0;i < arreglonodos.size();i++){
+        string vd="VD";
+        string letra="";
+        letra = toupper(arreglonodos[i].letra);
+        string numero = to_string(arreglonodos[i].numero);
+        idtmp = vd+letra+numero;
+        for(int i=0;i<Mkfsids.size();i++){
+            if(Mkfsids[i]==idtmp){
+                mkfstrue=true;
+            }
+        }
+        if(idtmp==id){
+            flag=true;
+            if(!SesionActiva){
+                if(mkfstrue){
+                int retornoVerificacion = VerificarLogin(arreglonodos[i].path,arreglonodos[i].name,usuario,contrasena);
+                if(retornoVerificacion == 1){
+                    SesionActiva = true;
+                    cout << "\033[96m Sesion iniciada con exito\033[0m" << endl;
+                }else if(retornoVerificacion == 2)
+                    cout << "\033[91m Error: Contrasena incorrecta\033[0m" << endl;
+                else if(retornoVerificacion == 0)
+                    cout << "\033[91m Error: Usuario no encontrado \033[0m" << endl;   
+                break;    
+            }else{
+                cout << "\033[91m Error:Se debe formatear la particion con formato EXT2 o EXT3 antes de intentar iniciar sesion\033[0m" << endl;
+            }             
+        }else{
+            cout<<"\033[91m Error: Se a encontrado una seccion activa porfavor haga un LOGOUT y vuelva a intentar loguearse \033[0m"<<endl;
+        }
+        }
+    }
+    if(!flag){
+        cout<<"\033[91m Error: No se encontro la partición montada con ese id!!!\n Las particiones montadas son: \033[0m"<<endl;
+    }
+}
 int main(int argc, char const *argv[])
 {
     cout<<"\033[92m********************************************"<<endl;
@@ -1408,6 +1685,8 @@ int main(int argc, char const *argv[])
     while((string)Linea_Comando!="EXIT"){
         cout<<"\033[96mCommand :: \033[0m";
         cin.getline(Linea_Comando,200,'\n');
+        char lineaSincasteo[200];
+        strcpy(lineaSincasteo,Linea_Comando);      
         string tmp=CastearMayuscula(Linea_Comando);//Casteamos a mayuscula toda la linea para evitarnos problemas del case-insensitive.
         vector<string> ls= SplitSpace(tmp);
         if(ls[0]=="EXEC"){
@@ -1420,7 +1699,7 @@ int main(int argc, char const *argv[])
             }
         }
         else{
-            EjecutarComando(Linea_Comando);
+            EjecutarComando(lineaSincasteo);
         }
 
     }    

@@ -17,6 +17,7 @@
 #include <fstream>
 #include <iostream>
 #include <fstream>
+#include <cmath>
 using namespace std;
 using std::cout; using std::cin;
 using std::endl; using std::string;
@@ -100,6 +101,37 @@ struct SuperBloque{
     int s_bm_block_start; //Guardara el inicio del bitmap de bloques
     int s_inode_start; //Guarada el inicio de la tabla de inodos
     int s_block_start; //Guardara el inicio de la tabla de bloques
+};
+struct Tabla_Inodos{
+    int i_uid; //UID del usuario propiertario del archivo/carpeta
+    int i_gid; //GID del grupo al que pertenece el archivo/carpeta
+    int i_size; //Tamano del archivo en bytes
+    time_t i_atime; //Ultima fecha en que se leyo el inodo sin modificarlo
+    time_t i_ctime; //Fecha en que se creo el el inodo
+    time_t i_mtime; //Ultima fecha en la que se modifco
+    int i_block[15]; //Array de bloques
+    char i_type; //Indica si es archivo o carpeta
+    int i_perm; //Guarada los permisos del archivo/carpeta
+    
+};
+struct Bloque_Archivos{
+    char b_content[64];
+};
+struct Content{
+    char b_name[12];//Nombre carpeta/archivo
+    int b_inodo;//Apuntador hacia un inodo asociado al archivo o carpeta
+};
+struct Bloque_Carpetas{
+    Content b_content[4];//Array con el contenido de la carpeta
+};
+struct Journaling{
+    char Journal_tipo_operacion[10];
+    int Journal_tipo;//Archivo/Carpeta
+    char Journal_nombre[100];
+    char Journal_contenido[100];
+    time_t Journal_fecha;
+    int Journal_propietario;
+    int Journal_permisos;
 };
 void CrearDisco(DiscoD op){
 cout<<"\033[92m************************CREANDO DISCO*************************\033[0m\n"<<endl;
@@ -1110,11 +1142,224 @@ void DesmontarParticion(string id){
     }
 }
 
-void FormatEXT2(int inicio ,int tam,string path){
-    cout<<"FORMATEO EXT2"<<endl;
+void FormatEXT2(int inicio ,int tamano,string direccion){
+    double n = 1+(tamano - static_cast<int>(sizeof(SuperBloque))-1)/(4+static_cast<int>(sizeof(Tabla_Inodos)) +3*static_cast<int>(sizeof(Bloque_Carpetas)));
+    int ContadorEstructuras = static_cast<int>(floor(n));//Calculo para el numero de inodos
+    int ContadorBloques = 3*ContadorEstructuras;
+    //Asignamo todos los parametros del super bloque
+    SuperBloque SBlock;
+    SBlock.s_filesystem_type = 2;
+    SBlock.s_inodes_count = ContadorEstructuras;
+    SBlock.s_blocks_count = ContadorBloques;
+    SBlock.s_free_blocks_count = ContadorBloques -2;
+    SBlock.s_free_inodes_count = ContadorEstructuras -2;
+    SBlock.s_mtime = time(nullptr);//como aun no se ha montado
+    SBlock.s_umtime = 0;
+    SBlock.s_mnt_count = 0;
+    SBlock.s_magic = 0xEF53;
+    SBlock.s_inode_size = sizeof(Tabla_Inodos);
+    SBlock.s_block_size = sizeof(Bloque_Archivos);
+    SBlock.s_first_ino = 2;
+    SBlock.s_first_blo = 2;
+    //EStablecemos inicios de las diferente estructuras tanto de bitmaps como de inodos
+    SBlock.s_bm_inode_start = inicio + static_cast<int>(sizeof(SuperBloque));
+    SBlock.s_bm_block_start = inicio + static_cast<int>(sizeof(SuperBloque)) + ContadorEstructuras;
+    SBlock.s_inode_start = inicio + static_cast<int>(sizeof (SuperBloque)) + ContadorEstructuras + ContadorBloques;
+    SBlock.s_block_start = inicio + static_cast<int>(sizeof(SuperBloque)) + ContadorEstructuras + ContadorBloques + (static_cast<int>(sizeof(Tabla_Inodos))*ContadorEstructuras);
+    //Declaramos la tabla de nodos y el bloque de carpetas
+    Tabla_Inodos InodoBlock;
+    Bloque_Carpetas Block;
+
+    char buffer = '0';
+    char buffer2 = '1';
+    char buffer3 = '2';
+
+    FILE *fileDisk = fopen(direccion.c_str(),"rb+");
+    fseek(fileDisk,inicio,SEEK_SET);//Establecemos la posicion de donde escribiremos
+    fwrite(&SBlock,sizeof(SuperBloque),1,fileDisk);//Escribimos el superbloque
+    for(int i = 0; i < ContadorEstructuras; i++){
+        fseek(fileDisk,SBlock.s_bm_inode_start + i,SEEK_SET);//Establecemos posicion
+        fwrite(&buffer,sizeof(char),1,fileDisk);//Escribimos el bitmap de inodos en todas las estructuras
+    }
+    fseek(fileDisk,SBlock.s_bm_inode_start,SEEK_SET);
+    fwrite(&buffer2,sizeof(char),1,fileDisk);// llenamos para users
+    fwrite(&buffer2,sizeof(char),1,fileDisk);
+    for(int i = 0; i < ContadorBloques; i++){
+        fseek(fileDisk,SBlock.s_bm_block_start + i,SEEK_SET);//Establecemos posicion
+        fwrite(&buffer,sizeof(char),1,fileDisk);//Escibimos los bloques
+    }
+    fseek(fileDisk,SBlock.s_bm_block_start,SEEK_SET);
+    fwrite(&buffer2,sizeof(char),1,fileDisk);
+    fwrite(&buffer3,sizeof(char),1,fileDisk);// llenamos para users
+
+    //Llenamos para el usuario root
+    InodoBlock.i_uid = 1;
+    InodoBlock.i_gid = 1;
+    InodoBlock.i_size = 0;
+    InodoBlock.i_atime = time(nullptr);
+    InodoBlock.i_ctime = time(nullptr);
+    InodoBlock.i_mtime = time(nullptr);
+    InodoBlock.i_block[0] = 0;
+    for(int i = 1; i < 15;i++)
+        InodoBlock.i_block[i] = -1;
+    InodoBlock.i_type = '0';
+    InodoBlock.i_perm = 664;
+    fseek(fileDisk,SBlock.s_inode_start,SEEK_SET);
+    fwrite(&InodoBlock,sizeof(Tabla_Inodos),1,fileDisk);
+    //Copiamos para el bloque de la carpeta root con la carpeta actual
+    strcpy(Block.b_content[0].b_name,".");
+    Block.b_content[0].b_inodo=0;   
+    //Ahora para la capeta padre
+    strcpy(Block.b_content[1].b_name,"..");
+    Block.b_content[1].b_inodo=0;
+    //Copiamos al archivo
+    strcpy(Block.b_content[2].b_name,"users.txt");
+    Block.b_content[2].b_inodo=1;
+
+    strcpy(Block.b_content[3].b_name,".");
+    Block.b_content[3].b_inodo=-1;
+    fseek(fileDisk,SBlock.s_block_start,SEEK_SET);
+    fwrite(&Block,sizeof(Bloque_Carpetas),1,fileDisk);
+    //Inodo para los usuarios del archivo txt
+    InodoBlock.i_uid = 1;
+    InodoBlock.i_gid = 1;
+    InodoBlock.i_size = 27;
+    InodoBlock.i_atime = time(nullptr);
+    InodoBlock.i_ctime = time(nullptr);
+    InodoBlock.i_mtime = time(nullptr);
+    InodoBlock.i_block[0] = 1;
+    for(int i = 1; i < 15;i++){
+        InodoBlock.i_block[i] = -1;
+    }
+    InodoBlock.i_type = '1';
+    InodoBlock.i_perm = 755;
+    fseek(fileDisk,SBlock.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+    fwrite(&InodoBlock,sizeof(Tabla_Inodos),1,fileDisk);
+    //Bloque de archivos para el usuario root
+    Bloque_Archivos archivo;
+    memset(archivo.b_content,0,sizeof(archivo.b_content));
+    strcpy(archivo.b_content,"1,G,root\n1,U,root,root,123\n");
+    fseek(fileDisk,SBlock.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas)),SEEK_SET);
+    fwrite(&archivo,sizeof(Bloque_Archivos),1,fileDisk);
+
+    cout << "\033[96mFormateo de tipo EXT2 realizada con éxito\033[0m" << endl;
+    fclose(fileDisk);//Cerramos el disco
 }
-void FormatEXT3(int inicio,int tam ,string path){
-    cout<<"FORMATEO EXT3"<<endl;
+
+
+void FormatEXT3(int inicio,int tamano ,string direccion){
+    double n = 1+(tamano - static_cast<int>(sizeof(SuperBloque))-1)/(4 + static_cast<int>(sizeof(Journaling))+static_cast<int>(sizeof(Tabla_Inodos)) +3*static_cast<int>(sizeof(Bloque_Carpetas)));
+    int ContadorEstructuras = static_cast<int>(floor(n));//Este tendra el bitmap de inodos
+    int ContadorBloques = 3*ContadorEstructuras;//Este llevara el bitmap de bloques
+    int super_size = static_cast<int>(sizeof(SuperBloque));
+    int journal_size = static_cast<int>(sizeof(Journaling))*ContadorEstructuras;
+
+    SuperBloque SBlock;
+    SBlock.s_filesystem_type = 3;
+    SBlock.s_inodes_count = ContadorEstructuras;
+    SBlock.s_blocks_count = ContadorBloques;
+    SBlock.s_free_blocks_count = ContadorBloques - 2;
+    SBlock.s_free_inodes_count = ContadorEstructuras - 2;
+    SBlock.s_mtime = time(nullptr);
+    SBlock.s_umtime = 0;
+    SBlock.s_mnt_count = 0;
+    SBlock.s_magic = 0xEF53;
+    SBlock.s_inode_size = sizeof(Tabla_Inodos);
+    SBlock.s_block_size = sizeof(Bloque_Archivos);
+    SBlock.s_first_ino = 2;
+    SBlock.s_first_blo = 2;
+    SBlock.s_bm_inode_start = inicio + super_size + journal_size;
+    SBlock.s_bm_block_start = inicio + super_size + journal_size + ContadorEstructuras;
+    SBlock.s_inode_start = inicio + super_size + journal_size + ContadorEstructuras + ContadorBloques;
+    SBlock.s_block_start = inicio + super_size + journal_size + ContadorEstructuras + ContadorBloques + static_cast<int>(sizeof(Tabla_Inodos))*ContadorEstructuras;
+
+    Tabla_Inodos InodoBlock;
+    Bloque_Carpetas Block;
+
+    char buffer = '0';
+    char buffer2 = '1';
+    char buffer3 = '2';
+
+    FILE *fileDisk = fopen(direccion.c_str(),"rb+");
+
+    //Posicionamos y escribimos para el superbloque 
+    fseek(fileDisk,inicio,SEEK_SET);
+    fwrite(&SBlock,sizeof(SuperBloque),1,fileDisk);
+    //Recorremos todas las estructuras y escribimos para los bitmaps de inodos
+    for(int i = 0; i < ContadorEstructuras; i++){
+        fseek(fileDisk,SBlock.s_bm_inode_start + i,SEEK_SET);
+        fwrite(&buffer,sizeof(char),1,fileDisk);
+    }
+    //Escribimos el bit para el root / y para users txt
+    fseek(fileDisk,SBlock.s_bm_inode_start,SEEK_SET);
+    fwrite(&buffer2,sizeof(char),1,fileDisk);
+    fwrite(&buffer2,sizeof(char),1,fileDisk);
+    //Recorremos los bloques y escribimos los bitmaps de los mismos
+    for(int i = 0; i < ContadorBloques; i++){
+        fseek(fileDisk,SBlock.s_bm_block_start + i,SEEK_SET);
+        fwrite(&buffer,sizeof(char),1,fileDisk);
+    }
+    //bitmap para root / y para users txt
+    fseek(fileDisk,SBlock.s_bm_block_start,SEEK_SET);
+    fwrite(&buffer2,sizeof(char),1,fileDisk);
+    fwrite(&buffer3,sizeof(char),1,fileDisk);
+    //Inodo para la carpeta raiz del root
+    InodoBlock.i_uid = 1;
+    InodoBlock.i_gid = 1;
+    InodoBlock.i_size = 0;
+    InodoBlock.i_atime = time(nullptr);
+    InodoBlock.i_ctime = time(nullptr);
+    InodoBlock.i_mtime = time(nullptr);
+    InodoBlock.i_block[0] = 0;
+    for(int i = 1; i < 15;i++){
+        InodoBlock.i_block[i] = -1;
+    }
+    InodoBlock.i_type = '0';
+    InodoBlock.i_perm = 664;
+    fseek(fileDisk,SBlock.s_inode_start,SEEK_SET);
+    fwrite(&InodoBlock,sizeof(Tabla_Inodos),1,fileDisk);
+    //Bloque para la carpeta root
+
+    //Escribimos en la caprta actual
+    strcpy(Block.b_content[0].b_name,".");
+    Block.b_content[0].b_inodo=0;
+
+    //Copiamos a la carpeta padre
+    strcpy(Block.b_content[1].b_name,"..");
+    Block.b_content[1].b_inodo=0;
+
+    
+    strcpy(Block.b_content[2].b_name,"users.txt");
+    Block.b_content[2].b_inodo=1;
+
+    strcpy(Block.b_content[3].b_name,".");
+    Block.b_content[3].b_inodo=-1;
+    fseek(fileDisk,SBlock.s_block_start,SEEK_SET);
+    fwrite(&Block,sizeof(Bloque_Carpetas),1,fileDisk);
+    //Llenamos parametros para los inodos de los usuarios
+    InodoBlock.i_uid = 1;
+    InodoBlock.i_gid = 1;
+    InodoBlock.i_size = 27;
+    InodoBlock.i_atime = time(nullptr);
+    InodoBlock.i_ctime = time(nullptr);
+    InodoBlock.i_mtime = time(nullptr);
+    InodoBlock.i_block[0] = 1;
+    for(int i = 1; i < 15;i++){
+        InodoBlock.i_block[i] = -1;
+    }
+    InodoBlock.i_type = '1';
+    InodoBlock.i_perm = 755;
+    fseek(fileDisk,SBlock.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+    fwrite(&InodoBlock,sizeof(Tabla_Inodos),1,fileDisk);
+    //Bloque para los archivos de los usuarios
+    Bloque_Archivos archivo;
+    memset(archivo.b_content,0,sizeof(archivo.b_content));
+    strcpy(archivo.b_content,"1,G,root\n1,U,root,root,123\n");
+    fseek(fileDisk,SBlock.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas)),SEEK_SET);
+    fwrite(&archivo,sizeof(Bloque_Archivos),1,fileDisk);
+
+    cout << "\033[96mFormateo de tipo EXT3 realizada con éxito\033[0m" << endl;
+    fclose(fileDisk);//Cerramos el disco
 }
 void ComandoMKFS(string id,string type,int fs){
     string idtmp;
@@ -1126,22 +1371,22 @@ void ComandoMKFS(string id,string type,int fs){
         string numero = to_string(arreglonodos[i].numero);
         idtmp = vd+letra+numero;
         if(idtmp==id){ 
-            int index = FindPrimariaYExtendida(arreglonodos[i].path,arreglonodos[i].name);
-                if(index != -1){
-                    MBR masterboot;
-                    FILE *fp = fopen(arreglonodos[i].path.c_str(),"rb+");
-                    fread(&masterboot,sizeof(MBR),1,fp);
-                    int inicio = masterboot.mbr_partition[index].part_start;
-                    int tamano = masterboot.mbr_partition[index].part_size;
+            int contador = FindPrimariaYExtendida(arreglonodos[i].path,arreglonodos[i].name);
+                if(contador != -1){
+                    MBR mbr;
+                    FILE *fileDisk = fopen(arreglonodos[i].path.c_str(),"rb+");
+                    fread(&mbr,sizeof(MBR),1,fileDisk);
+                    int inicio = mbr.mbr_partition[contador].part_start;
+                    int tamano = mbr.mbr_partition[contador].part_size;
                     if(fs == 2){
                         FormatEXT2(inicio,tamano,arreglonodos[i].path);
                     }
                     else if(fs==3){
                         FormatEXT3(inicio,tamano,arreglonodos[i].path);
                     }
-                    fclose(fp);
+                    fclose(fileDisk);
                 }else{
-                    index = FindLogic(arreglonodos[i].path,arreglonodos[i].name);
+                    contador = FindLogic(arreglonodos[i].path,arreglonodos[i].name);
                 }            
             flag = true;
             break;    

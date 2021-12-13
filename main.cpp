@@ -49,6 +49,8 @@ char ObtenerFit(string,string);
 void login(string,string,string);
 void logout();
 
+
+//mmadf
 void MKGRP(string);
 int ObtenerIDG();
 void SaveJournaling(char* ,int ,int ,char *,char *);
@@ -56,6 +58,16 @@ void AddUserstxt(string );
 int FindBit(FILE *, char , char );
 void RMGRP(string);
 void REMOVERGRUPO(string);
+
+void MKUSR(string , string , string );
+bool buscarUsuario(string );
+int getID_usr();
+void RMUSR(string );
+void eliminarUsuario(string );
+void cambiarPermisosRecursivo(FILE* , int , int perisos);
+void CHMOD(string , string ,bool );
+int buscarCarpetaArchivo(FILE *, char* );
+int byteInodoBloque(FILE *,int , char );
 vector<string> Mkfsids;
 
 //Variables globales
@@ -121,9 +133,9 @@ struct SuperBloque{
     time_t s_umtime; //Ultima fecha en que el sistema fue desmontado
     int s_mnt_count; //Indica cuantas veces se ha montado el sistema
     int s_magic; //Valor que identifica al sistema de archivos 0xEF53
-    int s_inode_size; //Tamano del inodo
+    int s_inode_size; //Tamano del Inodo
     int s_block_size; //Tamano del bloque
-    int s_first_ino; //Primer inodo libre
+    int s_first_ino; //Primer Inodo libre
     int s_first_blo; //Primero bloque libre
     int s_bm_inode_start; //Guardara el inicio del bitmap de inodos
     int s_bm_block_start; //Guardara el inicio del bitmap de bloques
@@ -134,8 +146,8 @@ struct Tabla_Inodos{
     int i_uid; //UID del usuario propiertario del archivo/carpeta
     int i_gid; //GID del grupo al que pertenece el archivo/carpeta
     int i_size; //Tamano del archivo en bytes
-    time_t i_atime; //Ultima fecha en que se leyo el inodo sin modificarlo
-    time_t i_ctime; //Fecha en que se creo el el inodo
+    time_t i_atime; //Ultima fecha en que se leyo el Inodo sin modificarlo
+    time_t i_ctime; //Fecha en que se creo el el Inodo
     time_t i_mtime; //Ultima fecha en la que se modifco
     int i_block[15]; //Array de bloques
     char i_type; //Indica si es archivo o carpeta
@@ -147,7 +159,7 @@ struct Bloque_Archivos{
 };
 struct Content{
     char b_name[12];//Nombre carpeta/archivo
-    int b_inodo;//Apuntador hacia un inodo asociado al archivo o carpeta
+    int b_inodo;//Apuntador hacia un Inodo asociado al archivo o carpeta
 };
 struct Bloque_Carpetas{
     Content b_content[4];//Array con el contenido de la carpeta
@@ -161,15 +173,18 @@ struct Journaling{
     int Journal_propietario;
     int Journal_permisos;
 };
+struct BloqueDeApuntadores{
+    int b_pointers[16];//Array con los apuntadores hacia bloques
+};
 void CrearDisco(DiscoD op){
 cout<<"\033[92m************************CREANDO DISCO*************************\033[0m\n"<<endl;
     string s = path + op.path;//url raiz + url de la entrada
     char sc[s.size() + 1];
     strcpy(sc, s.c_str());
     FILE *file=NULL;
-    file=fopen(sc,"r"); //r= read = sera verdadero si el disco ya existe
+    file=fopen(sc,"r"); //r= read = sera verdadero si el disco ya Exist
     if(file!=NULL){
-        cout<<"\033[91mYa existe el disco\033[0m"<<endl;
+        cout<<"\033[91mYa Exist el disco\033[0m"<<endl;
         return;//error
     }
     //Tamaño para distintas unidades que se piden
@@ -556,6 +571,59 @@ void EjecutarComando(char comando[200]){
                         RMGRP(auxiliarSinCastear[1]);
                     }
                 }              
+            }else if(lineSplit[0] == "MKUSR"){
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear;
+                string usuario;
+                string pass;
+                string grupo;
+                bool flag=true;
+                if(lineSplit.size()!=4){
+                    flag=false;
+                }
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-USR"){
+                        usuario = auxiliarSinCastear[1];
+                    }else if(auxiliar[0] == "-PWD"){
+                        pass = auxiliarSinCastear[1];
+                    }
+                    else if(auxiliar[0] == "-GRP"){
+                        grupo = auxiliarSinCastear[1];
+                    }
+                }
+                if(flag){
+                    MKUSR(usuario,pass,grupo);
+                }
+            }else if(lineSplit[0] == "RMUSR"){
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-USR"){
+                        RMUSR(auxiliarSinCastear[1]);
+                    }
+                }              
+            }else if(lineSplit[0] == "CHMOD"){
+                bool r =false;
+                string path,ugo;
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear,auxiliarr;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarr = Split(lineSplit[i],"-");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-PATH"){
+                        path = auxiliar[1];
+                    }else if(auxiliar[0] == "-UGO"){
+                       ugo = auxiliar[1];
+                    }else if(auxiliarr[1] == "R"){
+                        r = true;
+                    }
+                }
+                CHMOD(path,ugo,r);              
             }
     }
 }
@@ -759,7 +827,7 @@ void ParticionPrimaria(int size,char unit,string ruta,char fit,string name){
                     }
                 
                 }else{
-                    cout<<"\033[91mError: La particion ya existe!!\033[0m"<<endl;
+                    cout<<"\033[91mError: La particion ya Exist!!\033[0m"<<endl;
                 }  
             }else{
                 cout<<"\033[91mError: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre\033[0m"<<endl;
@@ -931,7 +999,7 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                             cout<< "\n \033[96mParticion EXTENDIDA creada con exito de tipo WORST FIT\033[0m"<< endl;
                         }
                     }else{
-                        cout << "\033[91mError: La particion ya existe!!\033[0m" << endl;
+                        cout << "\033[91mError: La particion ya Exist!!\033[0m" << endl;
                     }
                 }else{
                     cout << "\033[91mError: No hay tanto espacio disponible, intenta con una particion que no exceda el espacio libre\033[0m" << endl;
@@ -940,7 +1008,7 @@ void PaticionExtendida(int size,char unit,string ruta,char fit,string name){
                 cout << "\033[91mError: Ya se posee el numero maximo de particiones que son 4, elimina una para poder crear particion lógica!!\033[0m" << endl;
             }
         }else{
-            cout << "\033[91mError: Ya existe una partición de tipo EXTENDIDA\033[0m" << endl;
+            cout << "\033[91mError: Ya Exist una partición de tipo EXTENDIDA\033[0m" << endl;
         }
     fclose(fileDisk);
     }else{
@@ -1029,7 +1097,7 @@ void ParticionLogica(int size,char unit,string ruta,char fit,string name){
                 cout << "\033[91mError: No se puede crear partición lógica sin extendida, crear partición EXTENDIDA antes.\033[0m" << endl;
             }
         }else{
-            cout << "\033[91mError: Ya existe una partición con el mismo nombre, cambielo e intente de nuevo.\033[0m" << endl;
+            cout << "\033[91mError: Ya Exist una partición con el mismo nombre, cambielo e intente de nuevo.\033[0m" << endl;
         }
 
     fclose(filelogic);
@@ -1224,7 +1292,7 @@ void FormatEXT2(int inicio ,int tamano,string direccion){
     double n = 1+(tamano - static_cast<int>(sizeof(SuperBloque))-1)/(4+static_cast<int>(sizeof(Tabla_Inodos)) +3*static_cast<int>(sizeof(Bloque_Carpetas)));
     int ContadorEstructuras = static_cast<int>(floor(n));//Calculo para el numero de inodos
     int ContadorBloques = 3*ContadorEstructuras;
-    //Asignamo todos los parametros del super bloque
+    //Asignamo todos los parametros del SB bloque
     SuperBloque SBlock;
     SBlock.s_filesystem_type = 2;
     SBlock.s_inodes_count = ContadorEstructuras;
@@ -1484,19 +1552,19 @@ int FindGrupo(string grupo){
 
     char arreglochar[400] = "\0";
     SuperBloque SB;
-    Tabla_Inodos inodo;
+    Tabla_Inodos Inodo;
 
     fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
     fread(&SB,sizeof(SuperBloque),1,FileDisk);
-    //Leemos el inodo del archivo users.txt
+    //Leemos el Inodo del archivo users.txt
     fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);
-    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
 
     for(int i = 0; i < 15; i++){
-        if(inodo.i_block[i] != -1){
+        if(Inodo.i_block[i] != -1){
             Bloque_Archivos archivo;
             fseek(FileDisk,SB.s_block_start,SEEK_SET);
-            for(int j = 0; j <= inodo.i_block[i]; j++){
+            for(int j = 0; j <= Inodo.i_block[i]; j++){
                 fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
             }
             strcat(arreglochar,archivo.b_content);
@@ -1534,19 +1602,19 @@ int VerificarParametros(string user,string password,string direccion){
 
     char arreglochar[400] = "\0";
     SuperBloque SB;
-    Tabla_Inodos inodo;
+    Tabla_Inodos Inodo;
 
     fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
     fread(&SB,sizeof(SuperBloque),1,FileDisk);
-    //Leemos el inodo del archivo users.txt
+    //Leemos el Inodo del archivo users.txt
     fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
 
     for(int i = 0; i < 15; i++){
-        if(inodo.i_block[i] != -1){
+        if(Inodo.i_block[i] != -1){
             Bloque_Archivos archivo;
             fseek(FileDisk,SB.s_block_start,SEEK_SET);
-            for(int j = 0; j <= inodo.i_block[i]; j++){
+            for(int j = 0; j <= Inodo.i_block[i]; j++){
                 fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
             }
             strcat(arreglochar,archivo.b_content);
@@ -1628,16 +1696,16 @@ int VerificarLogin(string path,string nombre,string user,string password){
     if(contador != -1){
         MBR mbr;
         SuperBloque SB;
-        Tabla_Inodos inodo;
+        Tabla_Inodos Inodo;
         FILE *FileDisk = fopen(path.c_str(),"rb+");
         fread(&mbr,sizeof(MBR),1,FileDisk);
         fseek(FileDisk,mbr.mbr_partition[contador].part_start,SEEK_SET);
         fread(&SB,sizeof(SuperBloque),1,FileDisk);
         fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-        fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
         fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-        inodo.i_atime = time(nullptr);
-        fwrite(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        Inodo.i_atime = time(nullptr);
+        fwrite(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
         fclose(FileDisk);
         SesionActual.PosicionInicialSB = mbr.mbr_partition[contador].part_start;
         SesionActual.fit = mbr.mbr_partition[contador].part_fit;
@@ -1648,15 +1716,15 @@ int VerificarLogin(string path,string nombre,string user,string password){
         contador = FindLogic(path, nombre);
         if(contador != -1){
             SuperBloque SB;
-            Tabla_Inodos inodo;
+            Tabla_Inodos Inodo;
             FILE *FileDisk = fopen(path.c_str(),"rb+");
             fseek(FileDisk,contador + static_cast<int>(sizeof(EBR)),SEEK_SET);
             fread(&SB,sizeof(SuperBloque),1,FileDisk);
             fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-            fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
             fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-            inodo.i_atime = time(nullptr);
-            fwrite(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            Inodo.i_atime = time(nullptr);
+            fwrite(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
             fclose(FileDisk);
             SesionActual.PosicionInicialSB = contador + static_cast<int>(sizeof(EBR));
             SesionActual.fit = ObtenerFit(path,nombre);
@@ -1734,7 +1802,7 @@ void MKGRP(string name){
                     int idGrp = ObtenerIDG();
                     string nuevoGrupo = to_string(idGrp)+",G,"+nombreGrupo+"\n";
                     AddUserstxt(nuevoGrupo);
-                    cout << "Grupo creado con exito "<< endl;
+                    cout << "\033[96m El grupo se creo exitosamente :D \033[0m "<< endl;
                     //Guardamos el registro en el journal si es un EXT3
                     if(SesionActual.FS ==3){
                         char aux[64];
@@ -1746,13 +1814,13 @@ void MKGRP(string name){
                         SaveJournaling(operacion,0  ,0,aux,content);
                     }
                 }else
-                    cout << "ERROR ya existe un grupo con ese nombre" << endl;
+                    cout << "\033[91m Error: Este grupo ya Exist, cambiele nombre porfavor \033[0m" << endl;
             }else
-                cout << "ERROR el nombre del grupo no puede exceder los 10 caracters" << endl;
+                cout << "\033[91m Error: El nombre es muy largo, maximo 10 caracteres \033[0m " << endl;
         }else
-            cout << "ERROR solo el usuario root puede ejecutar este comando" << endl;
+            cout << " \033[91m Error: No esta logeado con el usuario ROOT, accion no posible!! \033[0m " << endl;
     }else
-        cout << "ERROR necesita iniciar sesion para poder ejecutar este comando" << endl;
+        cout << "\033[91m Error: Sesion no iniciada \033[0m " << endl;
 }
 int ObtenerIDG(){
     FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
@@ -1760,17 +1828,17 @@ int ObtenerIDG(){
     char arreglochar[400] = "\0";
     int Identificadortmp = -1;
     SuperBloque SB;
-    Tabla_Inodos inodo;
+    Tabla_Inodos Inodo;
     fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
     fread(&SB,sizeof(SuperBloque),1,FileDisk);
-    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);//Posicionamos para el inodo
-    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);//Leemos el inodo.. del txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);//Posicionamos para el Inodo
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);//Leemos el Inodo.. del txt
 
     for(int i = 0; i < 15; i++){
-        if(inodo.i_block[i] != -1){
+        if(Inodo.i_block[i] != -1){
             Bloque_Archivos file;
             fseek(FileDisk,SB.s_block_start,SEEK_SET);
-            for(int j = 0; j <= inodo.i_block[i]; j++){
+            for(int j = 0; j <= Inodo.i_block[i]; j++){
                 fread(&file,sizeof(Bloque_Archivos),1,FileDisk);
             }
             strcat(arreglochar,file.b_content);
@@ -1830,18 +1898,18 @@ void AddUserstxt(string datos){
     FILE *FileDisk = fopen(SesionActual.direccion.c_str(), "rb+");
 
     SuperBloque SB;
-    Tabla_Inodos inodo;
+    Tabla_Inodos Inodo;
     Bloque_Archivos ArchivoBloque;
     int NumBloque = 0;
 
     fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
     fread(&SB,sizeof(SuperBloque),1,FileDisk);
     fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);
-    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
 
     for(int i = 0; i < 12; i++){
-        if(inodo.i_block[i] != -1)
-            NumBloque = inodo.i_block[i];
+        if(Inodo.i_block[i] != -1)
+            NumBloque = Inodo.i_block[i];
     }
 
     fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*NumBloque,SEEK_SET);
@@ -1854,11 +1922,11 @@ void AddUserstxt(string datos){
         fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*NumBloque,SEEK_SET);
         fwrite(&ArchivoBloque,sizeof(Bloque_Archivos),1,FileDisk);
         fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-        fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
-        inodo.i_size = inodo.i_size + datos.length();
-        inodo.i_mtime = time(nullptr);
+        fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        Inodo.i_size = Inodo.i_size + datos.length();
+        Inodo.i_mtime = time(nullptr);
         fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-        fwrite(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        fwrite(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
     }else{
         string tmp = "";
         string tmp1 = "";
@@ -1889,15 +1957,15 @@ void AddUserstxt(string datos){
         fwrite(&auxArchivo,sizeof(Bloque_Archivos),1,FileDisk);
 
         /*
-        Escribimos el inodo que se cambio
+        Escribimos el Inodo que se cambio
         */
         fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-        fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
-        inodo.i_size = inodo.i_size + datos.length();
-        inodo.i_mtime = time(nullptr);
-        inodo.i_block[NumBloque] = bit;
+        fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        Inodo.i_size = Inodo.i_size + datos.length();
+        Inodo.i_mtime = time(nullptr);
+        Inodo.i_block[NumBloque] = bit;
         fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-        fwrite(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+        fwrite(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
         /*
         Escribimos los bloques que quedan libres y seteamos el primero disponible ahra
         */
@@ -2043,17 +2111,17 @@ void RMGRP(string name){
             if(grupo != -1){
                 REMOVERGRUPO(nombreGrupo);
             }else
-                cout << "ERROR el grupo no existe" << endl;
+                cout << "\033[91m Error: Grupo inexistente \033[0m " << endl;
         }else
-           cout << "ERROR solo el usuario root puede ejecutar este comando" << endl;
+           cout << "\033[91m Error: Comando solo peude ser ejecutado por el usuario ROOT \033[0m " << endl;
     }else
-        cout << "ERROR necesita iniciar sesion para poder ejecutar este comando" << endl;
+        cout << "\033[91m Error: Sesion no iniciada \033[0m " << endl;
 }
 void REMOVERGRUPO(string name){
-    FILE *fp = fopen(SesionActual.direccion.c_str(),"rb+");
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
 
-    SuperBloque super;
-    Tabla_Inodos inodo;
+    SuperBloque SB;
+    Tabla_Inodos Inodo;
     Bloque_Archivos archivo;
 
     int columna = 1;
@@ -2067,28 +2135,28 @@ void REMOVERGRUPO(string name){
     bool tmp = false;
 
 
-    fseek(fp,SesionActual.PosicionInicialSB,SEEK_SET);
-    fread(&super,sizeof(SuperBloque),1,fp);
-    //Nos posicionamos en el inodo del archivo users.txt
-    fseek(fp,super.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
-    fread(&inodo,sizeof(Tabla_Inodos),1,fp);
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    //Nos posicionamos en el Inodo del archivo users.txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
 
     for (int i = 0; i < 12; i++) {
-        if(inodo.i_block[i] != -1){
-            fseek(fp,super.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*inodo.i_block[i],SEEK_SET);
-            fread(&archivo,sizeof(Bloque_Archivos),1,fp);
+        if(Inodo.i_block[i] != -1){
+            fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*Inodo.i_block[i],SEEK_SET);
+            fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
             for(int j = 0; j < 63; j++){
                 actual = archivo.b_content[j];
                 if(actual=='\n'){
                     if(tipo == 'G'){
                         grupo = palabra;
                         if(strcmp(grupo.c_str(),name.c_str()) == 0){
-                            fseek(fp,super.s_block_start+static_cast<int>(sizeof(Bloque_Archivos))*BloqueContador,SEEK_SET);
-                            fread(&archivo,sizeof(Bloque_Carpetas),1,fp);
+                            fseek(FileDisk,SB.s_block_start+static_cast<int>(sizeof(Bloque_Archivos))*BloqueContador,SEEK_SET);
+                            fread(&archivo,sizeof(Bloque_Carpetas),1,FileDisk);
                             archivo.b_content[posicion] = '0';
-                            fseek(fp,super.s_block_start+static_cast<int>(sizeof(Bloque_Archivos))*BloqueContador,SEEK_SET);
-                            fwrite(&archivo,sizeof(Bloque_Archivos),1,fp);
-                            cout << "Grupo eliminado con exito" << endl;
+                            fseek(FileDisk,SB.s_block_start+static_cast<int>(sizeof(Bloque_Archivos))*BloqueContador,SEEK_SET);
+                            fwrite(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                            cout << "\033[96m El grupo se elimino exitosamente!! :D \033[0m" << endl;
                             tmp = true;
                             break;
                         }
@@ -2102,7 +2170,7 @@ void REMOVERGRUPO(string name){
                     if(columna == 2){
                         id = atoi(palabra.c_str());
                         posicion = j-1;
-                        BloqueContador = inodo.i_block[i];
+                        BloqueContador = Inodo.i_block[i];
                     }
                     else if(columna == 4)
                         tipo = palabra[0];
@@ -2115,8 +2183,391 @@ void REMOVERGRUPO(string name){
         }
     }
 
-    fclose(fp);
+    fclose(FileDisk);
 }
+
+
+
+void MKUSR(string user, string pass, string group){
+    if(user.length() <= 10){
+        if(pass.length() <= 10){
+            if(group.length() <= 10){
+                if(SesionActiva){
+                    if(SesionActual.IDU == 1 && SesionActual.IDG == 1){//Usuario root
+                        if(FindGrupo(group) != -1){
+                            if(!buscarUsuario(user)){
+                                int id = getID_usr();
+                                string datos = to_string(id) + ",U,"+group+","+user+","+pass+"\n";
+                                AddUserstxt(datos);
+                                cout << "\033[96m El usuario se elimino exitosamente!! :D \033[0m"  << endl;
+                                //Guardamos el registro en el journal si es un sistema EXT3
+                                if(SesionActual.FS ==3){
+                                    char aux[64];
+                                    char operacion[10];
+                                    char content[2];
+                                    strcpy(aux,datos.c_str());
+                                    strcpy(operacion,"mkusr");
+                                    memset(content,0,2);
+                                    SaveJournaling(operacion,0,0,aux,content);
+                                }
+                            }else
+                                cout << "\033[91m Error: Este usuario ya existe \033[0m " <<endl;
+                        }else
+                            cout << "\033[91m Error: No se encuentra el grupo de este usuario \033[0m  " << endl;
+                    }else
+                        cout << "\033[91m Error: Este comando solamente es para el usuario ROOT lo siento :c \033[0m " << endl;
+                }else
+                    cout << "\033[91m Error: Debe iniciar sesión para poder ejecutar el comando \033[0m " << endl;
+            }else
+                cout << "\033[91m Error: El nombre del grupo excede los 10 caracteres permitidos ;( \033[0m " << endl;
+        }else
+            cout << "\033[91m Error: La contraseña excede los 10 caracters permitidos!! \033[0m " << endl;
+    }else
+        cout << "\033[91m Error: El nombre del usuario excede los 10 caracteres permitidos :c !\033[0m " << endl;
+}
+bool buscarUsuario(string name){
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+
+    char cadena[400] = "\0";
+    SuperBloque SB;
+    Tabla_Inodos Inodo;
+
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    //Nos posicionamos en el Inodo del archivo users.txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    for(int i = 0; i < 15; i++){
+        if(Inodo.i_block[i] != -1){
+            Bloque_Archivos archivo;
+            fseek(FileDisk,SB.s_block_start,SEEK_SET);
+            for(int j = 0; j <= Inodo.i_block[i]; j++){
+                fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            }
+            strcat(cadena,archivo.b_content);
+        }
+    }
+
+    fclose(FileDisk);
+
+    char *end_str;
+    char *llave = strtok_r(cadena,"\n",&end_str);
+    while(llave != nullptr){
+        char id[2];
+        char tipo[2];
+        char user[12];
+        char *end_token;
+        char *token2 = strtok_r(llave,",",&end_token);
+        strcpy(id,token2);
+        if(strcmp(id,"0") != 0){//Verificar que no sea un U/G eliminado
+            token2 = strtok_r(nullptr,",",&end_token);
+            strcpy(tipo,token2);
+            if(strcmp(tipo,"U") == 0){
+                token2 = strtok_r(nullptr,",",&end_token);
+                token2 = strtok_r(nullptr,",",&end_token);
+                strcpy(user,token2);
+
+                if(strcmp(user,name.c_str()) == 0)
+                    return true;
+            }
+        }
+        llave = strtok_r(nullptr,"\n",&end_str);
+    }
+
+    return false;
+}
+int getID_usr(){
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+
+    char cadena[400] = "\0";
+    int res = 0;
+    SuperBloque SB;
+    Tabla_Inodos Inodo;
+
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    //Nos posicionamos en el Inodo del archivo users.txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    for(int i = 0; i < 15; i++){
+        if(Inodo.i_block[i] != -1){
+            Bloque_Archivos archivo;
+            fseek(FileDisk,SB.s_block_start,SEEK_SET);
+            for(int j = 0; j <= Inodo.i_block[i]; j++){
+                fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            }
+            strcat(cadena,archivo.b_content);
+        }
+    }
+
+    fclose(FileDisk);
+
+    char *end_str;
+    char *llave = strtok_r(cadena,"\n",&end_str);
+    while(llave != nullptr){
+        char id[2];
+        char tipo[2];
+        char *end_token;
+        char *token2 = strtok_r(llave,",",&end_token);
+        strcpy(id,token2);
+        if(strcmp(id,"0") != 0){//Verificar que no sea un U/G eliminado
+            token2 = strtok_r(nullptr,",",&end_token);
+            strcpy(tipo,token2);
+            if(strcmp(tipo,"U") == 0)
+                res++;
+        }
+        llave = strtok_r(nullptr,"\n",&end_str);
+    }
+    return ++res;
+}
+
+
+void RMUSR(string userName){
+    if(SesionActiva){
+        if(SesionActual.IDU == 1 && SesionActual.IDG == 1){
+            if(buscarUsuario(userName)){
+                eliminarUsuario(userName);
+            }else
+                cout << "\033[91m Error: El usuario no se encontro, no existe.\033[0m " << endl;
+        }else
+           cout << "\033[91m Error: Lo sentimos pero este comando solo esta permitido para el usuario ROOT \033[0m " << endl;
+    }else
+        cout << "\033[91m Error: Debe iniciar sesión para ejecutar comando (user ROOT) !!\033[0m " << endl;
+}
+void eliminarUsuario(string name){
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+
+    SuperBloque SB;
+    Tabla_Inodos Inodo;
+    Bloque_Archivos archivo;
+
+    int col = 1;
+    char actual;
+    string palabra = "";
+    int posicion = 0;
+    int numBloque = 0;
+    int id = -1;
+    char tipo = '\0';
+    string grupo = "";
+    string usuario = "";
+    bool flag = false;
+
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)),SEEK_SET);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    for (int i = 0; i < 12; i++) {
+        if(Inodo.i_block[i] != -1){
+            fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*Inodo.i_block[i],SEEK_SET);
+            fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            for(int j = 0; j < 63; j++){
+                actual = archivo.b_content[j];
+                if(actual=='\n'){
+                    if(tipo == 'U'){
+                        if(strcmp(usuario.c_str(),name.c_str()) == 0){
+                            fseek(FileDisk,SB.s_block_start+static_cast<int>(sizeof(Bloque_Archivos))*numBloque,SEEK_SET);
+                            fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                            archivo.b_content[posicion] = '0';
+                            fseek(FileDisk,SB.s_block_start+static_cast<int>(sizeof(Bloque_Archivos))*numBloque,SEEK_SET);
+                            fwrite(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                            cout << "\033[96m Se eliminó el usuario con éxito :D \033[0m " << endl;
+                            flag = true;
+                            break;
+                        }
+                        usuario = "";
+                        grupo = "";
+                    }
+                    col = 1;
+                    palabra = "";
+                }else if(actual != ','){
+                    palabra += actual;
+                    col++;
+                }else if(actual == ','){
+                    if(col == 2){
+                        id = atoi(palabra.c_str());
+                        posicion = j-1;
+                        numBloque = Inodo.i_block[i];
+                    }
+                    else if(col == 4)
+                        tipo = palabra[0];
+                    else if(grupo == "")
+                        grupo = palabra;
+                    else if(usuario == "")
+                        usuario = palabra;
+                    col++;
+                    palabra = "";
+                }
+            }
+            if(flag)
+                break;
+        }
+    }
+
+    fclose(FileDisk);
+}
+
+
+
+void cambiarPermisosRecursivo(FILE* archivo, int n, int permisos){
+    SuperBloque SB;
+    Tabla_Inodos Inodo;
+    Bloque_Carpetas carpeta;
+    char b ='0';
+
+    fseek(archivo,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,archivo);
+    fseek(archivo,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*n,SEEK_SET);
+    fread(&Inodo,sizeof(Tabla_Inodos),1,archivo);
+    Inodo.i_perm = permisos;
+    fseek(archivo,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*n,SEEK_SET);
+    fwrite(&Inodo,sizeof(Tabla_Inodos),1,archivo);
+
+    for(int i = 0; i < 15; i++){
+        if(Inodo.i_block[i] != -1){
+            fseek(archivo,SB.s_bm_block_start + Inodo.i_block[i],SEEK_SET);
+            b = static_cast<char>(fgetc(archivo));
+            if(b == '1'){
+                fseek(archivo,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*Inodo.i_block[i],SEEK_SET);
+                fread(&carpeta,sizeof(Bloque_Carpetas),1,archivo);
+                for(int j = 0; j < 4; j++){
+                    if(carpeta.b_content[j].b_inodo != -1){
+                        if(strcmp(carpeta.b_content[j].b_name,".")!=0 &&  strcmp(carpeta.b_content[j].b_name,"..")!=0)
+                            cambiarPermisosRecursivo(archivo,carpeta.b_content[j].b_inodo,permisos);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void CHMOD(string pathg, string ugo,bool flagR){
+    if(SesionActiva){
+
+        int user =stoi(to_string(ugo.at(0)).c_str()) - '0';//Obtener el valor numero de un char
+        int grupo = stoi(to_string(ugo.at(0)).c_str()) - '0';
+        int otros = stoi(to_string(ugo.at(0)).c_str()) - '0';
+        if((user >= 0 && user <= 7) && (grupo >= 0 && grupo <= 7) && (otros >= 0 && otros <= 7)){
+            char auxPath[500];
+            strcpy(auxPath,pathg.c_str());
+            FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+            SuperBloque SB;
+            Tabla_Inodos Inodo;
+            int Exist = buscarCarpetaArchivo(FileDisk,auxPath);
+            fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+            fread(&SB,sizeof(SuperBloque),1,FileDisk);
+            fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*Exist,SEEK_SET);
+            fread(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            if(Exist != -1){
+                if((SesionActual.IDU ==1 && SesionActual.IDG == 1) || SesionActual.IDU == Inodo.i_uid){
+                    if(flagR)
+                        cambiarPermisosRecursivo(FileDisk,Exist,stoi(ugo));
+                    else{
+                        Inodo.i_perm = stoi(ugo);
+                        fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*Exist,SEEK_SET);
+                        fwrite(&Inodo,sizeof(Tabla_Inodos),1,FileDisk);
+                    }
+                    cout << "\033[96m Permisos cambiados exitosamente!! \033[0m " << endl;
+                }else
+                    cout << "\033[91m Error: Para cambiar los permisos debes ser propietario de la capeta o el archivo, sino estar logeado con el usuario root \033[0m " << endl;
+            }else
+                cout << "\033[91m Error: La ruta no existe. \033[0m " << endl;
+            fclose(FileDisk);
+        }else
+            cout << "\033[91m Error: Algún dígito del UGO esta fuera de rango, solo esta permitido del 0 hasta el 7 \033[0m "<< endl;
+    }else
+        cout << "\033[91m Error: Debe iniciar sesión para ejecutar este comando...\033[0m " << endl;
+}
+
+int buscarCarpetaArchivo(FILE *archivo, char* path){
+    SuperBloque SB;
+    Tabla_Inodos Inodo;
+    Bloque_Carpetas carpeta;
+    BloqueDeApuntadores Punter;
+
+    vector<string> lista;
+    char *llave = strtok(path,"/");
+    int cont = 0;
+    int numInodo = 0;
+
+    while(llave != nullptr){
+        lista.push_back(llave);
+        cont++;
+        llave = strtok(nullptr,"/");
+    }
+
+    fseek(archivo,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,archivo);
+    //Posicionamos para el bit donde inicia el inodo
+    numInodo = SB.s_inode_start; 
+
+    for (int cont2 = 0; cont2 < cont; cont2++) {
+        fseek(archivo,numInodo,SEEK_SET);
+        fread(&Inodo,sizeof(Tabla_Inodos),1,archivo);
+        int siguiente = 0;
+        for(int i = 0; i < 15; i++){
+            if(Inodo.i_block[i] != -1){
+                //Apuntador directo
+                int byteBloque = byteInodoBloque(archivo,Inodo.i_block[i],'2');
+                fseek(archivo,byteBloque,SEEK_SET);
+                if(i < 12){
+                    fread(&carpeta,sizeof(Bloque_Carpetas),1,archivo);
+                    for (int j = 0; j < 4; j++) {
+                        if((cont2 == cont - 1) && (strcasecmp(carpeta.b_content[j].b_name,lista.at(cont2).c_str()) == 0)){//Haceos match con la carpeta
+                            return carpeta.b_content[j].b_inodo;
+                        }else if((cont2 != cont - 1) && (strcasecmp(carpeta.b_content[j].b_name,lista.at(cont2).c_str()) == 0)){
+                            numInodo = byteInodoBloque(archivo,carpeta.b_content[j].b_inodo,'1');
+                            siguiente = 1;
+                            break;
+                        }
+                    }
+                }else if(i == 12){
+                    //Apuntador inidrecto
+                    fread(&Punter,sizeof(BloqueDeApuntadores),1,archivo);
+                    for(int j = 0; j < 16; j++){
+                        if(Punter.b_pointers[j] != -1){
+                            byteBloque = byteInodoBloque(archivo,Punter.b_pointers[j],'2');
+                            fseek(archivo,byteBloque,SEEK_SET);
+                            fread(&carpeta,sizeof(Bloque_Carpetas),1,archivo);
+                            for (int k = 0; k < 4; k++) {
+                                if((cont2 == cont - 1) && (strcasecmp(carpeta.b_content[k].b_name,lista.at(cont2).c_str()) == 0)){//Haceos match con la carpeta
+                                    return carpeta.b_content[k].b_inodo;
+                                }else if((cont2 != cont - 1) && (strcasecmp(carpeta.b_content[k].b_name,lista.at(cont2).c_str()) == 0)){
+                                    numInodo = byteInodoBloque(archivo,carpeta.b_content[k].b_inodo,'1');
+                                    siguiente = 1;
+                                    break;
+                                }
+                            }
+                            if(siguiente == 1)
+                                break;
+                        }
+                    }
+                }else if(i == 13){
+
+                }else if(i == 14){
+
+                }
+                if(siguiente == 1)
+                    break;
+            }
+        }
+    }
+
+    return -1;
+}
+int byteInodoBloque(FILE *archivo,int pos, char tipo){
+    SuperBloque SB;
+    fseek(archivo,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,archivo);
+    if(tipo == '1'){
+        return (SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*pos);
+    }else if(tipo == '2')
+        return (SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*pos);
+    return 0;
+}
+
 int main(int argc, char const *argv[])
 {
     cout<<"\033[92m********************************************"<<endl;

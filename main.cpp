@@ -76,7 +76,7 @@ int crearArchivo(string , bool , int , string );
 int nuevoArchivo(FILE *, char , bool , char *, int , string , int ,char *);
 
 bool permisosDeEscritura(int , bool , bool );
-
+string EliminarComillas(string );
 int nuevaCarpeta(FILE *, char , bool , char *, int );
 string getDirectorio(string );
 void MKDIR(string ,string ,bool );
@@ -306,6 +306,22 @@ void borrardisco(string ruta){//Metodo que recibe como parametro un path a elimi
         cout<<"\033[91mError: No se pudo eliminar el archivo\033[0m\n"<<endl;
     }
 }
+
+string EliminarComillasYreemplazarEspacios(string cadena){
+    string retorno=cadena;
+    char e = cadena.at(0);
+    if(e=='\"'){//Si viene una comilla en el primer espacio las vamos a eliminar
+        
+        retorno = EliminarComillas(cadena);//Eliminamos comillas
+        cout<<retorno<<endl;
+        return retorno;//Sino retornamos solamente sin comillas
+
+    }else{//Si no vienen comillas retornamos
+        cout<<retorno<<endl;
+        return retorno;
+    }
+    
+}
 void EjecutarComando(char comando[200]){
     char temporal[200];
     strcpy(temporal,comando);
@@ -333,8 +349,11 @@ void EjecutarComando(char comando[200]){
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
                     if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
-                        mkcarpetas(auxiliar[1]);//Creamos las carpetas con el path ingresado.
-                        Disk1.path = auxiliar[1];//Asignamos el path al disco
+                        string auxiliare = auxiliar[1];
+                        string path;
+                        path = EliminarComillasYreemplazarEspacios(auxiliare);
+                        mkcarpetas(path);//Creamos las carpetas con el path ingresado.
+                        Disk1.path = path;//Asignamos el path al disco                    
                     }else if(auxiliar[0]=="-FIT"){//Asignamos el fit al disco
                         if(auxiliar[1]=="BF"){
                             Disk1.fit= 'B';
@@ -386,7 +405,10 @@ void EjecutarComando(char comando[200]){
                 aux = Split(lineSplit[1],"~:~");
                 if(aux[0] == "-PATH"){
                     dir = path+aux[1];
-                    borrardisco(dir); 
+                    string auxiliare = dir;
+                    string path;
+                    path = EliminarComillasYreemplazarEspacios(auxiliare);
+                    borrardisco(path); 
                 }           
             }else if(lineSplit[0]=="FDISK"){
                 int sizeerror,fiterror,uniterror,typeerror =0;
@@ -422,7 +444,10 @@ void EjecutarComando(char comando[200]){
                             cout<<"\033[91mError: Esta tratando de ingresar una unidad no permitida para crear una particion\033[0m"<<endl;
                         }    
                     }else if(auxiliar[0]=="-PATH"){
-                        rutapart = auxiliar[1];    
+                        string auxiliare = auxiliar[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                        rutapart = pathx;    
                     }else if(auxiliar[0]=="-TYPE"){
                         if(auxiliar[1]=="P"){
                             typepart = 'P';
@@ -496,7 +521,10 @@ void EjecutarComando(char comando[200]){
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
                     if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
-                        ruta = auxiliar[1];
+                        string auxiliare = auxiliar[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                        ruta = pathx;
                     }else if(auxiliar[0]=="-NAME"){
                         nombre = auxiliar[1];
                     }
@@ -635,7 +663,10 @@ void EjecutarComando(char comando[200]){
                     auxiliarr = Split(lineSplit[i],"-");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){
-                        path = auxiliar[1];
+                        string auxiliare = auxiliar[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                        path = pathx;
                     }else if(auxiliar[0] == "-UGO"){
                        ugo = auxiliar[1];
                     }else if(auxiliarr[1] == "R"){
@@ -656,7 +687,11 @@ void EjecutarComando(char comando[200]){
                     auxiliarr = Split(lineSplit[i],"-");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){
-                        path = auxiliar[1];
+                        string auxiliare = auxiliar[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+
+                        path = pathx;
                         namepath = Split(path,"/");
                         name = namepath[namepath.size()-1];
 
@@ -680,7 +715,11 @@ void EjecutarComando(char comando[200]){
                     auxiliarr = Split(lineSplit[i],"-");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){
-                        path = auxiliar[1];
+                        string auxiliare = auxiliar[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+
+                        path = pathx;
                         namepath = Split(path,"/");
                         name = namepath[namepath.size()-1];
 
@@ -3833,12 +3872,17 @@ int main(int argc, char const *argv[])
         strcpy(lineaSincasteo,Linea_Comando);      
         string tmp=CastearMayuscula(Linea_Comando);//Casteamos a mayuscula toda la linea para evitarnos problemas del case-insensitive.
         vector<string> ls= SplitSpace(tmp);
+        vector<string> lsx=SplitSpace(lineaSincasteo);
         if(ls[0]=="EXEC"){
-            vector<string> tmp;
+            vector<string> tmp,auxiliarSinCastear;
             tmp = Split(ls[1],"~:~");
+            auxiliarSinCastear = Split(lsx[1],"~:~");
             if(tmp[0]=="-PATH"){
+                string auxiliare = auxiliarSinCastear[1];
+                string pathx;
+                pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                 string ruta;
-                ruta = path+tmp[1];
+                ruta = path+pathx;
                 leerscript(ruta);
             }
         }

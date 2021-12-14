@@ -646,9 +646,7 @@ void EjecutarComando(char comando[200]){
                 string pass;
                 string grupo;
                 bool flag=true;
-                if(lineSplit.size()!=4){
-                    flag=false;
-                }
+                
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
@@ -1931,7 +1929,7 @@ string EliminarComillas(string cadena){
     return result;
 }
 void MKGRP(string name){
-    string nombreGrupo = EliminarComillas(name); 
+    string nombreGrupo = EliminarComillasYreemplazarEspacios(name); 
     if(SesionActiva){
         if(SesionActual.IDU == 1 && SesionActual.IDG == 1){//Usuario root
             if(nombreGrupo.length() <= 10){
@@ -2242,7 +2240,7 @@ int FindBit(FILE *FileDisk, char tipo, char fit){
     return 0;
 }
 void RMGRP(string name){
-    string nombreGrupo = EliminarComillas(name);
+    string nombreGrupo = EliminarComillasYreemplazarEspacios(name);
     if(SesionActiva){
         if(SesionActual.IDU == 1 && SesionActual.IDG == 1){//Usuario root
             int grupo = FindGrupo(nombreGrupo);
@@ -2325,8 +2323,8 @@ void REMOVERGRUPO(string name){
 }
 
 void MKUSR(string userx, string pass, string groupx){
-    string user = EliminarComillas(userx);
-    string group = EliminarComillas(groupx);
+    string user = EliminarComillasYreemplazarEspacios(userx);
+    string group = EliminarComillasYreemplazarEspacios(groupx);
     if(user.length() <= 10){
         if(pass.length() <= 10){
             if(group.length() <= 10){
@@ -2337,7 +2335,7 @@ void MKUSR(string userx, string pass, string groupx){
                                 int id = getID_usr();
                                 string datos = to_string(id) + ",U,"+group+","+user+","+pass+"\n";
                                 AddUserstxt(datos);
-                                cout << "\033[96m El usuario se elimino exitosamente!! :D \033[0m"  << endl;
+                                cout << "\033[96m El usuario se creo exitosamente!! :D \033[0m"  << endl;
                                 //Guardamos el registro en el journal si es un sistema EXT3
                                 if(SesionActual.FS ==3){
                                     char aux[64];

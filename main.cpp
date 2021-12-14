@@ -51,7 +51,7 @@ int VerificarParametros(string,string,string);
 char ObtenerFit(string,string);
 void login(string,string,string);
 void logout();
-
+void DesmontarParticionSinMensaje(string,int);
 
 //mmadf
 void MKGRP(string);
@@ -249,6 +249,7 @@ Tabla_Inodos crearInodo(int ,char ,int );
 Bloque_Carpetas crearBloqueCarpeta();
 int buscarContentLibre(FILE* ,int ,Tabla_Inodos &,Bloque_Carpetas &, BloqueDeApuntadores &,int &,int &,int &);
 ActiveSession SesionActual;
+vector<nodoParticionMontada> arreglonodos;
 //Funcion para transformar la entrada a letra mayuscula y asi poder hacer una aplicacion case-insensitive
 string CastearMayuscula(char cad1[]){
     int i;
@@ -348,8 +349,10 @@ void EjecutarComando(char comando[200]){
                 vector<string> auxiliar;
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
+                    vector<string> auxiliarSinCastear;
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
-                        string auxiliare = auxiliar[1];
+                        string auxiliare = auxiliarSinCastear[1];
                         string path;
                         path = EliminarComillasYreemplazarEspacios(auxiliare);
                         mkcarpetas(path);//Creamos las carpetas con el path ingresado.
@@ -402,12 +405,26 @@ void EjecutarComando(char comando[200]){
             }else if(lineSplit[0]=="RMDISK"){
                 string dir;
                 vector<string> aux;
+                vector<string> auxiliarSinCastear;
+                auxiliarSinCastear = Split(lineSplitSinCasteo[1],"~:~");
                 aux = Split(lineSplit[1],"~:~");
                 if(aux[0] == "-PATH"){
-                    string auxiliare = aux[1];
+                    string auxiliare = auxiliarSinCastear[1];
                     string pathx;
                     pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                     dir = path +pathx;
+                    int cont = arreglonodos.size();
+                    for(int i = 0; i < cont;i++){
+                        if(arreglonodos[i].path == dir){
+                            string vd = "vd";
+                            string letra = "";
+                            letra.push_back(arreglonodos[i].letra);
+                            string numero = to_string(arreglonodos[i].numero);
+                            string id = vd+letra+numero;
+                            DesmontarParticionSinMensaje(id,cont);
+                            continue;
+                        }
+                    }
                     borrardisco(dir); 
                 }           
             }else if(lineSplit[0]=="FDISK"){
@@ -421,6 +438,8 @@ void EjecutarComando(char comando[200]){
                 bool deffit,deftype,defunit=false;
                 vector<string> auxiliar;
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    vector<string> auxiliarSinCastear;
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     auxiliar = Split(lineSplit[i],"~:~");
                     if(auxiliar[0] == "-SIZE"){//Si el comando es el -path entonces entrara a esta condicional
                         if(stof(auxiliar[1])<=0){
@@ -444,7 +463,7 @@ void EjecutarComando(char comando[200]){
                             cout<<"\033[91mError: Esta tratando de ingresar una unidad no permitida para crear una particion\033[0m"<<endl;
                         }    
                     }else if(auxiliar[0]=="-PATH"){
-                        string auxiliare = auxiliar[1];
+                        string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                         rutapart = pathx;    
@@ -518,10 +537,12 @@ void EjecutarComando(char comando[200]){
             }else if(lineSplit[0] == "MOUNT"){
                 string ruta, nombre;
                 vector<string> auxiliar;
+                vector<string> auxiliarSinCastear;
                 for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
                     auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){//Si el comando es el -path entonces entrara a esta condicional
-                        string auxiliare = auxiliar[1];
+                        string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                         ruta = pathx;
@@ -663,7 +684,7 @@ void EjecutarComando(char comando[200]){
                     auxiliarr = Split(lineSplit[i],"-");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){
-                        string auxiliare = auxiliar[1];
+                        string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                         path = pathx;
@@ -687,7 +708,7 @@ void EjecutarComando(char comando[200]){
                     auxiliarr = Split(lineSplit[i],"-");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){
-                        string auxiliare = auxiliar[1];
+                        string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
 
@@ -715,7 +736,7 @@ void EjecutarComando(char comando[200]){
                     auxiliarr = Split(lineSplit[i],"-");
                     auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
                     if(auxiliar[0] == "-PATH"){
-                        string auxiliare = auxiliar[1];
+                        string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
 
@@ -1210,7 +1231,7 @@ void ParticionLogica(int size,char unit,string ruta,char fit,string name){
     }
 
 }
-vector<nodoParticionMontada> arreglonodos;
+
 int FindLetra(string name, string path){
     int letra = 'a';
     if(arreglonodos.size()==0){//Si esta vacio
@@ -1389,6 +1410,19 @@ void DesmontarParticion(string id){
     if(!flag){
         cout<<"\033[91m Error: No se encontro la partición que desea desmontar!!!\n Las particiones montadas son: \033[0m"<<endl;
         ImprimirParticinesMontadas();
+    }
+}
+void DesmontarParticionSinMensaje(string id,int cont){
+    string idtmp;
+    for(int i=0;i < cont;i++){
+        string vd="vd";
+        string letra="";
+        letra = arreglonodos[i].letra;
+        string numero = to_string(arreglonodos[i].numero);
+        idtmp = vd+letra+numero;
+        if(idtmp==id){ 
+            arreglonodos.erase(arreglonodos.begin()+ i);    
+        }
     }
 }
 
@@ -2290,7 +2324,9 @@ void REMOVERGRUPO(string name){
     fclose(FileDisk);
 }
 
-void MKUSR(string user, string pass, string group){
+void MKUSR(string userx, string pass, string groupx){
+    string user = EliminarComillas(userx);
+    string group = EliminarComillas(groupx);
     if(user.length() <= 10){
         if(pass.length() <= 10){
             if(group.length() <= 10){

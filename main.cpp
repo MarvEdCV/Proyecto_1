@@ -19,6 +19,9 @@
 #include <fstream>
 #include <cmath>
 #include <string>
+#include <filesystem>
+#include <libgen.h>
+
 using namespace std;
 using std::cout; using std::cin;
 using std::endl; using std::string;
@@ -68,7 +71,20 @@ void cambiarPermisosRecursivo(FILE* , int , int perisos);
 void CHMOD(string , string ,bool );
 int buscarCarpetaArchivo(FILE *, char* );
 int byteInodoBloque(FILE *,int , char );
+void MKFILE(string ,string ,int ,bool ,string );
+int crearArchivo(string , bool , int , string );
+int nuevoArchivo(FILE *, char , bool , char *, int , string , int ,char *);
+
+bool permisosDeEscritura(int , bool , bool );
+
+int nuevaCarpeta(FILE *, char , bool , char *, int );
+string getDirectorio(string );
+void MKDIR(string ,string ,bool );
+int crearCarpeta(string , bool p);
+
+void CAT(string );
 vector<string> Mkfsids;
+
 
 //Variables globales
 //TODO:ARREGLAR PATH 
@@ -229,6 +245,9 @@ cout<<"\033[92m************************CREANDO DISCO*************************\03
     fclose(file);
 }
 //FUNCIONES Y METODOS A UTILIZAR 
+Tabla_Inodos crearInodo(int ,char ,int );
+Bloque_Carpetas crearBloqueCarpeta();
+int buscarContentLibre(FILE* ,int ,Tabla_Inodos &,Bloque_Carpetas &, BloqueDeApuntadores &,int &,int &,int &);
 ActiveSession SesionActual;
 //Funcion para transformar la entrada a letra mayuscula y asi poder hacer una aplicacion case-insensitive
 string CastearMayuscula(char cad1[]){
@@ -624,6 +643,52 @@ void EjecutarComando(char comando[200]){
                     }
                 }
                 CHMOD(path,ugo,r);              
+            }else if(lineSplit[0] == "MKFILE"){
+                bool p =false;
+                string path="";
+                string cont="";
+                string name="";
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear,auxiliarr,namepath;
+                int size;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarr = Split(lineSplit[i],"-");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-PATH"){
+                        path = auxiliar[1];
+                        namepath = Split(path,"/");
+                        name = namepath[namepath.size()-1];
+
+                    }else if(auxiliar[0] == "-SIZE"){
+                       size = stof(auxiliar[1]);
+                    }else if(auxiliarr[1] == "P"){
+                        p = true;
+                    }else if(auxiliar[0] == "-CONT"){
+                       cont = auxiliar[1];
+                    }
+                }
+                MKFILE(path,cont,size,p,name);            
+            }else if(lineSplit[0] == "MKDIR"){
+                bool p =false;
+                string path="";
+                string name="";
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear,auxiliarr,namepath;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarr = Split(lineSplit[i],"-");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-PATH"){
+                        path = auxiliar[1];
+                        namepath = Split(path,"/");
+                        name = namepath[namepath.size()-1];
+
+                    }else if(auxiliarr[1] == "P"){
+                        p = true;
+                    }
+                }
+                MKDIR(name,path,p);            
             }
     }
 }
@@ -1547,6 +1612,8 @@ void ComandoMKFS(string id,string type,int fs){
 /*
 Funciones y metodos para el manejo del login y todas sus validaciones.
 */
+
+
 int FindGrupo(string grupo){
     FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
 
@@ -1689,8 +1756,6 @@ char ObtenerFit(string path,string nombre){
     }
     return -1;
 }
-
-
 int VerificarLogin(string path,string nombre,string user,string password){
     int contador = FindPrimariaYExtendida(path,nombre);
     if(contador != -1){
@@ -1806,12 +1871,12 @@ void MKGRP(string name){
                     //Guardamos el registro en el journal si es un EXT3
                     if(SesionActual.FS ==3){
                         char aux[64];
-                        char operacion[10];
-                        char content[2];
+                        char comando[10];
+                        char Contenido[2];
                         strcpy(aux,nuevoGrupo.c_str());
-                        strcpy(operacion,"mkgrp");
-                        memset(content,0,2);
-                        SaveJournaling(operacion,0  ,0,aux,content);
+                        strcpy(comando,"mkgrp");
+                        memset(Contenido,0,2);
+                        SaveJournaling(comando,0  ,0,aux,Contenido);
                     }
                 }else
                     cout << "\033[91m Error: Este grupo ya Exist, cambiele nombre porfavor \033[0m" << endl;
@@ -1867,10 +1932,10 @@ int ObtenerIDG(){
     }
     return ++Identificadortmp;
 }
-void SaveJournaling(char* operacion,int tipo,int permisos,char *nombre,char *content){
+void SaveJournaling(char* comando,int tipo,int permisos,char *nombre,char *content){
     SuperBloque SB;
     Journaling registroEXT3;
-    strcpy(registroEXT3.Journal_tipo_operacion,operacion);
+    strcpy(registroEXT3.Journal_tipo_operacion,comando);
     registroEXT3.Journal_tipo = tipo;
     strcpy(registroEXT3.Journal_nombre,nombre);
     strcpy(registroEXT3.Journal_contenido,content);
@@ -2186,8 +2251,6 @@ void REMOVERGRUPO(string name){
     fclose(FileDisk);
 }
 
-
-
 void MKUSR(string user, string pass, string group){
     if(user.length() <= 10){
         if(pass.length() <= 10){
@@ -2203,12 +2266,12 @@ void MKUSR(string user, string pass, string group){
                                 //Guardamos el registro en el journal si es un sistema EXT3
                                 if(SesionActual.FS ==3){
                                     char aux[64];
-                                    char operacion[10];
+                                    char comando[10];
                                     char content[2];
                                     strcpy(aux,datos.c_str());
-                                    strcpy(operacion,"mkusr");
+                                    strcpy(comando,"mkusr");
                                     memset(content,0,2);
-                                    SaveJournaling(operacion,0,0,aux,content);
+                                    SaveJournaling(comando,0,0,aux,content);
                                 }
                             }else
                                 cout << "\033[91m Error: Este usuario ya existe \033[0m " <<endl;
@@ -2409,8 +2472,6 @@ void eliminarUsuario(string name){
     fclose(FileDisk);
 }
 
-
-
 void cambiarPermisosRecursivo(FILE* archivo, int n, int permisos){
     SuperBloque SB;
     Tabla_Inodos Inodo;
@@ -2568,6 +2629,1195 @@ int byteInodoBloque(FILE *archivo,int pos, char tipo){
     return 0;
 }
 
+
+void MKFILE(string ruta,string Cont,int tamanio,bool P,string name){
+    if(name.length() <= 11){
+                if(SesionActiva){
+                    int ArchivoCreadoConExito = crearArchivo(ruta,P,tamanio,Cont);
+                    if(ArchivoCreadoConExito == 1){//Si el metodo nos devuelve que si se creo con exito
+                        if(SesionActual.FS == 3){//Si el disco es EXT3
+                            char tmp[500];
+                            char comando[8];
+                            char content[500];
+                            strcpy(tmp,ruta.c_str());
+                            strcpy(comando,"mkfile");
+                            strcpy(content,Cont.c_str());
+                            if(Cont.length() != 0)
+                                SaveJournaling(comando,0,664,tmp,content);
+                            else{
+                                strcpy(content,to_string(tamanio).c_str());
+                                SaveJournaling(comando,0,664,tmp,content);
+                            }
+                        }
+                        cout << "\033[96m Archivo creado con exito!! \033[0m " << endl;
+                    }else if(ArchivoCreadoConExito == 2)
+                        cout << "\033[91m El usuario no tiene permisos de escritura \033[0m" << endl;
+                    else if(ArchivoCreadoConExito == 3)
+                        cout << "\033[91m El archivo no existe \033[0m" << endl;
+                    else if(ArchivoCreadoConExito == 4)
+                        cout << "\033[91m La ruta de directorios no existe y el comando -p no esta activado para crearlo\033[0m" << endl;
+                }else
+                    cout << "\033[91m Porfavor inicie sesion para ejecutar este comando \033[0m" << endl;
+            }else
+                cout << "\033[91m El nombre sobrepasa el limite de caracteres \033[0m" << endl;
+                
+}
+int crearArchivo(string path, bool p, int size, string cont){
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+
+    SuperBloque SB;
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+
+    char RutaAuxiliar[500];
+    char RutaAuxiliartmp[500];
+    strcpy(RutaAuxiliar,path.c_str());
+    strcpy(RutaAuxiliartmp,path.c_str());
+    int existe = buscarCarpetaArchivo(FileDisk,RutaAuxiliar);
+    strcpy(RutaAuxiliar,path.c_str());
+    int retorno = -1;
+
+    if(existe != -1)
+        retorno = 0;
+    else
+        retorno = nuevoArchivo(FileDisk,SesionActual.fit,p,RutaAuxiliar,size,cont,0,RutaAuxiliartmp);
+
+    fclose(FileDisk);
+    return retorno;
+}
+
+int nuevoArchivo(FILE *stream, char fit, bool P, char *path, int size, string contenido, int index,char *auxPath){
+    SuperBloque SB;
+    Tabla_Inodos inodo,inodoNuevo;
+    Bloque_Carpetas carpeta, carpetaNueva;
+    BloqueDeApuntadores apuntadores;
+    vector<string> lista;
+    char Pathtmp[500];
+    char directorio[500];
+    char nombreCarpeta[80];
+    string content = "";
+    string contentSize = "0123456789";
+
+    strcpy(Pathtmp,path);
+    strcpy(directorio,dirname(Pathtmp));
+    strcpy(Pathtmp,path);
+    strcpy(nombreCarpeta,basename(Pathtmp));
+    strcpy(Pathtmp,path);
+    char *token = strtok(path,"/");
+    int cont = 0;
+    int numInodo = index;
+    int finalSize = size;
+
+    while(token != nullptr){
+        cont++;
+        lista.push_back(token);
+        token = strtok(nullptr,"/");
+    }
+
+    if(contenido.length() != 0){
+        FILE *archivoCont;
+        if((archivoCont = fopen(contenido.c_str(),"r"))){
+            fseek(archivoCont,0,SEEK_END);
+            finalSize = static_cast<int>(ftell(archivoCont));
+            fseek(archivoCont,0,SEEK_SET);
+            for (int i = 0; i < finalSize; i++)
+                content += static_cast<char>(fgetc(archivoCont));
+        }else
+            return 3;
+    }
+
+    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,stream);
+
+    if(cont == 1){
+        int bloque = 0;
+        int pointer = 0;
+        int b_content = 0;
+        int libre = buscarContentLibre(stream,numInodo,inodo,carpeta,apuntadores,b_content,bloque,pointer);
+
+        if(libre == 1){
+            bool permisos = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+            if(permisos || (SesionActual.IDU == 1 && SesionActual.IDG == 1)){
+                char buffer = '1';
+                char buffer2 = '2';
+                char buffer3 = '3';
+                //Agregamos el archivo al bloque correspondiente
+                int bitInodo = FindBit(stream,'I',fit);
+                carpeta.b_content[b_content].b_inodo = bitInodo;
+                strcpy(carpeta.b_content[b_content].b_name,nombreCarpeta);
+                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*inodo.i_block[bloque],SEEK_SET);
+                fwrite(&carpeta,sizeof(Bloque_Carpetas),1,stream);
+                //Creamos el nuevo inodo archivo
+                inodoNuevo = crearInodo(0,'1',664);
+                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                //Registramos el inodo en el bitmap
+                fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                fwrite(&buffer,sizeof(char),1,stream);
+                //Si viene el parametro -size/-cont
+                if(finalSize != 0){
+                    double n = static_cast<double>(finalSize)/static_cast<double>(63);
+                    int numBloques = static_cast<int>(ceil(n));
+                    int caracteres = finalSize;
+                    size_t charNum = 0;
+                    size_t contChar = 0;
+                    numInodo = buscarCarpetaArchivo(stream,auxPath);
+                    for (int i = 0; i < numBloques; i++) {
+                        Bloque_Archivos archivo;
+                        memset(archivo.b_content,0,sizeof(archivo.b_content));
+                        if(i == 12){
+                            int bitBloqueA = FindBit(stream,'B',fit);//Apuntador
+                            //Guardamos el bloque en el inodo archivo
+                            fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                            fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                            inodo.i_block[i] = bitBloqueA;
+                            fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                            fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                            //Registramos el bloque apuntador en el bitmap
+                            fseek(stream,SB.s_bm_block_start + bitBloqueA,SEEK_SET);
+                            fwrite(&buffer3,sizeof(char),1,stream);
+                            //Creamos el bloque de apuntadores como es simple solo se debe crear uno
+                            int bitBloque = FindBit(stream,'B',fit);//Primer bloque archivo
+                            apuntadores.b_pointers[0] = bitBloque;
+                            for(int i = 1; i < 16; i++)
+                                apuntadores.b_pointers[i] = -1;
+                            fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*bitBloqueA,SEEK_SET);
+                            fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                            //Empezamos con la creacion de bloques archivos
+                            //Registramos el primer bloque en el bitmap
+                            fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                            fwrite(&buffer2,sizeof(char),1,stream);
+                            if(caracteres > 63){
+                                for(int j = 0; j < 63; j++){
+                                    if(content.length() != 0){//-cont
+                                        archivo.b_content[j] = content[contChar];
+                                        contChar++;
+                                    }else{//-size
+                                        archivo.b_content[j] = contentSize[charNum];
+                                        charNum++;
+                                        if(charNum == 10)
+                                            charNum = 0;
+                                    }
+                                }
+                                //Guardamos el bloque
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                caracteres -= 63;
+                            }else{
+                                for (int j = 0; j < caracteres; j++) {
+                                    if(content.length() != 0){
+                                        archivo.b_content[j] = content[contChar];
+                                        contChar++;
+                                    }else{
+                                        archivo.b_content[j] = contentSize[charNum];
+                                        charNum++;
+                                        if(charNum == 10)
+                                            charNum = 0;
+                                    }
+                                }
+                                //Guardamos el bloque
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                            }
+                        }else if(i > 12 && i < 28){
+                            int libre = 0;
+                            fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                            fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                            fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[12],SEEK_SET);
+                            fread(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                            for (int a = 0; a < 16; a++) {
+                                if(apuntadores.b_pointers[a] == -1){
+                                    libre = a;
+                                    break;
+                                }
+                            }
+                            int bitBloque = FindBit(stream,'B',fit);
+                            apuntadores.b_pointers[libre] = bitBloque;
+                            fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[12],SEEK_SET);
+                            fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                            //Registramos el bloque en el bitmap
+                            fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                            fwrite(&buffer2,sizeof(char),1,stream);
+                            if(caracteres > 63){
+                                for(int j = 0; j < 63; j++){
+                                    if(content.length() != 0){//-cont
+                                        archivo.b_content[j] = content[contChar];
+                                        contChar++;
+                                    }else{//-size
+                                        archivo.b_content[j] = contentSize[charNum];
+                                        charNum++;
+                                        if(charNum == 10)
+                                            charNum = 0;
+                                    }
+                                }
+                                //Guardamos el bloque
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                caracteres -= 63;
+                            }else{
+                                for (int j = 0; j < caracteres; j++) {
+                                    if(content.length() != 0){
+                                        archivo.b_content[j] = content[contChar];
+                                        contChar++;
+                                    }else{
+                                        archivo.b_content[j] = contentSize[charNum];
+                                        charNum++;
+                                        if(charNum == 10)
+                                            charNum = 0;
+                                    }
+                                }
+                                //Guardamos el bloque
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                            }
+                        }else if(i == 29){//Apuntador doble
+
+                        }else{
+                            int bitBloque = FindBit(stream,'B',fit);
+                            //Registramos el bloque en el bitmap
+                            fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                            fwrite(&buffer2,sizeof(char),1,stream);
+                            if(caracteres > 63){
+                                for(int j = 0; j < 63; j++){
+                                    if(content.length() != 0){//-cont
+                                        archivo.b_content[j] = content[contChar];
+                                        contChar++;
+                                    }else{//-size
+                                        archivo.b_content[j] = contentSize[charNum];
+                                        charNum++;
+                                        if(charNum == 10)
+                                            charNum = 0;
+                                    }
+                                }
+                                //Guardamos el bloque en el respectivo inodo archivo
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                inodo.i_block[i] = bitBloque;
+                                inodo.i_size = finalSize;
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                //Guardamos el bloque
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                caracteres -= 63;
+                            }else{
+                                for (int j = 0; j < caracteres; j++) {
+                                    if(content.length() != 0){
+                                        archivo.b_content[j] = content[contChar];
+                                        contChar++;
+                                    }else{
+                                        archivo.b_content[j] = contentSize[charNum];
+                                        charNum++;
+                                        if(charNum == 10)
+                                            charNum = 0;
+                                    }
+                                }
+                                //Guardamos el bloque en el respectivo inodo archivo
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                inodo.i_block[i] = bitBloque;
+                                inodo.i_size = finalSize;
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                //Guardamos el bloque
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                            }
+                        }
+                    }
+                    //Modificamos el SB bloque
+                    SB.s_free_blocks_count = SB.s_free_blocks_count - numBloques;
+                    SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                    SB.s_first_ino = SB.s_first_ino + 1;
+                    SB.s_first_blo = SB.s_first_blo + numBloques;
+                    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                    fwrite(&SB,sizeof(SuperBloque),1,stream);
+                    return 1;
+                }
+                SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                SB.s_first_ino = SB.s_first_ino + 1;
+                fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                fwrite(&SB,sizeof(SuperBloque),1,stream);
+                return 1;
+            }else
+                return 2;
+        }else{//Todos los bloques estan llenos
+            fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+            fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+            for (int i = 0; i < 15; i++) {
+                if(inodo.i_block[i] == -1){
+                    bloque = i;
+                    break;
+                }
+            }
+            if(bloque == 12){//Apuntador simple indirecto
+                bool permissions = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+                if(permissions || (SesionActual.IDU == 1 && SesionActual.IDG == 1) ){
+
+                }else
+                    return 2;
+            }else if(bloque == 13){//Apuntador doble indirecto
+
+            }else if(bloque == 14){//Apuntador triple indirecto
+
+            }else{//Apuntadores directos
+                bool permisos = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+                if(permisos || (SesionActual.IDU == 1 && SesionActual.IDG == 1)){
+                    char buffer = '1';
+                    char buffer2 = '2';
+                    char buffer3 = '3';
+                    int bitBloque = FindBit(stream,'B',fit);
+                    //Guardamos el bloque en el inodo
+                    inodo.i_block[bloque] = bitBloque;
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                    fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                    //Creamos el nuevo bloque carpeta
+                    int bitInodo = FindBit(stream,'I',fit);
+                    carpetaNueva.b_content[0].b_inodo = bitInodo;
+                    carpetaNueva.b_content[1].b_inodo = -1;
+                    carpetaNueva.b_content[2].b_inodo = -1;
+                    carpetaNueva.b_content[3].b_inodo = -1;
+                    strcpy(carpetaNueva.b_content[0].b_name,nombreCarpeta);
+                    strcpy(carpetaNueva.b_content[1].b_name,"");
+                    strcpy(carpetaNueva.b_content[2].b_name,"");
+                    strcpy(carpetaNueva.b_content[3].b_name,"");
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                    fwrite(&carpetaNueva,sizeof(Bloque_Carpetas),1,stream);
+                    //Registramos el bloque en el bitmap
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Creamos el nuevo inodo
+                    inodoNuevo = crearInodo(0,'1',664);
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                    fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                    fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                    //Registramos el inodo en el bitmap
+                    fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Si viene el parametro -size/-cont
+                    if(finalSize != 0){
+                        double n = static_cast<double>(finalSize)/static_cast<double>(63);
+                        int numBloques = static_cast<int>(ceil(n));
+                        int caracteres = finalSize;
+                        size_t charNum = 0;
+                        size_t contChar = 0;
+                        numInodo = buscarCarpetaArchivo(stream,auxPath);
+                        for (int i = 0; i < numBloques; i++) {
+                            Bloque_Archivos archivo;
+                            memset(archivo.b_content,0,sizeof(archivo.b_content));
+                            if(i == 12){
+                                int bitBloqueA = FindBit(stream,'B',fit);//Apuntador
+                                //Guardamos el bloque en el inodo archivo
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                inodo.i_block[i] = bitBloqueA;
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                //Registramos el bloque apuntador en el bitmap
+                                fseek(stream,SB.s_bm_block_start + bitBloqueA,SEEK_SET);
+                                fwrite(&buffer3,sizeof(char),1,stream);
+                                //Creamos el bloque de apuntadores como es simple solo se debe crear uno
+                                int bitBloque = FindBit(stream,'B',fit);//Primer bloque archivo
+                                apuntadores.b_pointers[0] = bitBloque;
+                                for(int i = 1; i < 16; i++)
+                                    apuntadores.b_pointers[i] = -1;
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*bitBloqueA,SEEK_SET);
+                                fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                                //Empezamos con la creacion de bloques archivos
+                                //Registramos el primer bloque en el bitmap
+                                fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                                fwrite(&buffer2,sizeof(char),1,stream);
+                                if(caracteres > 63){
+                                    for(int j = 0; j < 63; j++){
+                                        if(content.length() != 0){//-cont
+                                            archivo.b_content[j] = content[contChar];
+                                            contChar++;
+                                        }else{//-size
+                                            archivo.b_content[j] = contentSize[charNum];
+                                            charNum++;
+                                            if(charNum == 10)
+                                                charNum = 0;
+                                        }
+                                    }
+                                    //Guardamos el bloque
+                                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                    fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                    caracteres -= 63;
+                                }else{
+                                    for (int j = 0; j < caracteres; j++) {
+                                        if(content.length() != 0){
+                                            archivo.b_content[j] = content[contChar];
+                                            contChar++;
+                                        }else{
+                                            archivo.b_content[j] = contentSize[charNum];
+                                            charNum++;
+                                            if(charNum == 10)
+                                                charNum = 0;
+                                        }
+                                    }
+                                    //Guardamos el bloque
+                                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                    fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                }
+                            }else if(i > 12 && i < 28){
+                                int libre = 0;
+                                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[12],SEEK_SET);
+                                fread(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                                for (int a = 0; a < 16; a++) {
+                                    if(apuntadores.b_pointers[a] == -1){
+                                        libre = a;
+                                        break;
+                                    }
+                                }
+                                int bitBloque = FindBit(stream,'B',fit);
+                                apuntadores.b_pointers[libre] = bitBloque;
+                                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[12],SEEK_SET);
+                                fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                                //Registramos el bloque en el bitmap
+                                fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                                fwrite(&buffer2,sizeof(char),1,stream);
+                                if(caracteres > 63){
+                                    for(int j = 0; j < 63; j++){
+                                        if(content.length() != 0){//-cont
+                                            archivo.b_content[j] = content[contChar];
+                                            contChar++;
+                                        }else{//-size
+                                            archivo.b_content[j] = contentSize[charNum];
+                                            charNum++;
+                                            if(charNum == 10)
+                                                charNum = 0;
+                                        }
+                                    }
+                                    //Guardamos el bloque
+                                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                    fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                    caracteres -= 63;
+                                }else{
+                                    for (int j = 0; j < caracteres; j++) {
+                                        if(content.length() != 0){
+                                            archivo.b_content[j] = content[contChar];
+                                            contChar++;
+                                        }else{
+                                            archivo.b_content[j] = contentSize[charNum];
+                                            charNum++;
+                                            if(charNum == 10)
+                                                charNum = 0;
+                                        }
+                                    }
+                                    //Guardamos el bloque
+                                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                    fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                }
+
+                            }else if(i == 29){//Apuntador doble
+
+                            }else{//Apuntadores simples
+                                int bitBloque = FindBit(stream,'B',fit);
+                                //Registramos el bloque en el bitmap
+                                fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                                fwrite(&buffer2,sizeof(char),1,stream);
+                                if(caracteres > 63){
+                                    for(int j = 0; j < 63; j++){
+                                        if(content.length() != 0){//-cont
+                                            archivo.b_content[j] = content[contChar];
+                                            contChar++;
+                                        }else{//-size
+                                            archivo.b_content[j] = contentSize[charNum];
+                                            charNum++;
+                                            if(charNum == 10)
+                                                charNum = 0;
+                                        }
+                                    }
+                                    //Guardamos el bloque en el respectivo inodo archivo
+                                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                    fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                    inodo.i_block[i] = bitBloque;
+                                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                    fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                    //Guardamos el bloque
+                                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                    fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                    caracteres -= 63;
+                                }else{
+                                    for (int j = 0; j < caracteres; j++) {
+                                        if(content.length() != 0){
+                                            archivo.b_content[j] = content[contChar];
+                                            contChar++;
+                                        }else{
+                                            archivo.b_content[j] = contentSize[charNum];
+                                            charNum++;
+                                            if(charNum == 10)
+                                                charNum = 0;
+                                        }
+                                    }
+                                    //Guardamos el bloque en el respectivo inodo archivo
+                                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                    fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                    inodo.i_block[i] = bitBloque;
+                                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                                    fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                                    //Guardamos el bloque
+                                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*bitBloque,SEEK_SET);
+                                    fwrite(&archivo,sizeof(Bloque_Archivos),1,stream);
+                                }
+                            }
+                        }
+                        //Modificamos el SB bloque
+                        SB.s_free_blocks_count = SB.s_free_blocks_count - numBloques;
+                        SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                        SB.s_first_ino = SB.s_first_ino + 1;
+                        SB.s_first_blo = SB.s_first_blo + numBloques;
+                        fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                        fwrite(&SB,sizeof(SuperBloque),1,stream);
+                        return 1;
+                    }
+                    SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                    SB.s_first_ino = SB.s_first_ino + 1;
+                    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                    fwrite(&SB,sizeof(SuperBloque),1,stream);
+                    return 1;
+                }else
+                    return 2;
+            }
+        }
+    }else{//Directorio
+        int existe = buscarCarpetaArchivo(stream,directorio);
+        if(existe == -1){
+            if(P){
+                int index = 0;
+                string tmp = "";
+                //Crear posibles carpetas inexistentes
+                for (int i = 0; i < cont; i++) {
+                    if(i == cont -1){
+                        char dir[100] = "/";
+                        strcat(dir,nombreCarpeta);
+                        return nuevoArchivo(stream,fit,false,dir,size,contenido,index,auxPath);
+                    }else{
+                        tmp += "/"+lista.at(i);
+                        char dir[500];
+                        char auxDir[500];
+                        strcpy(dir,tmp.c_str());
+                        strcpy(auxDir,tmp.c_str());
+                        int carpeta = buscarCarpetaArchivo(stream,dir);
+                        if(carpeta == -1){
+                            nuevaCarpeta(stream,fit,false,auxDir,index);
+                            strcpy(auxDir,tmp.c_str());
+                            index = buscarCarpetaArchivo(stream,auxDir);
+                        }else
+                            index = carpeta;
+                    }
+                }
+            }else
+                return 4;
+        }else{//Crear el archivo en el directorio
+            char dir[100] = "/";
+            strcat(dir,nombreCarpeta);
+            return nuevoArchivo(stream,fit,false,dir,size,contenido,existe,auxPath);
+        }
+    }
+
+    return 0;
+}
+
+int buscarContentLibre(FILE* stream,int numInodo,Tabla_Inodos &inodo,Bloque_Carpetas &carpeta, BloqueDeApuntadores &apuntadores,int &content,int &bloque,int &pointer){
+    int BanderaLibre = 0;
+    SuperBloque SB;
+    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,stream);
+    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+    fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+    /*
+    Buscamos en el bloque de la carpeta un espacio libre
+    */
+    for(int i = 0; i < 15; i++){
+        if(inodo.i_block[i] != -1){
+            if(i == 12){
+                //Apuntador indirecto simple
+                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[i],SEEK_SET);
+                fread(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                for(int j = 0; j < 16; j++){
+                    if(apuntadores.b_pointers[j] != -1){
+                        fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*apuntadores.b_pointers[j],SEEK_SET);
+                        fread(&carpeta,sizeof(Bloque_Carpetas),1,stream);
+                        for(int k = 0; k < 4; k++){
+                            if(carpeta.b_content[k].b_inodo == -1){
+                                BanderaLibre = 1;
+                                bloque = i;
+                                pointer = j;
+                                content = k;
+                                break;
+                            }
+                        }
+                    }
+                    if(BanderaLibre == 1)
+                        break;
+                }
+            }else if(i == 13){
+                //Apuntador indirecto doble(sin hacer)
+
+            }else if(i == 14){
+                //Apuntador indirecto tripe(sin hacer)
+
+            }else{
+                //Apuntador directo
+                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*inodo.i_block[i],SEEK_SET);
+                fread(&carpeta,sizeof(Bloque_Carpetas),1,stream);
+                for(int j = 0; j < 4; j++){
+                    if(carpeta.b_content[j].b_inodo == -1){
+                        BanderaLibre = 1;
+                        bloque = i;
+                        content = j;
+                        break;
+                    }
+                }
+            }
+        }
+        if(BanderaLibre == 1)
+            break;
+    }
+
+    return BanderaLibre;
+}
+
+/*
+Nos devuelve verdadero o falso si se tienen los permisos para escribir 
+*/
+bool permisosDeEscritura(int permisos, bool flagUser, bool flagGroup){
+    string stringpermisos = to_string(permisos);
+    char propietario = stringpermisos[0];
+    char grupo = stringpermisos[1];
+    char otros = stringpermisos[2];
+
+    //Retornamos los permisos comparando cada uno de los caracteres de UGO
+    if((propietario == '2' || propietario == '3' || propietario == '6' || propietario == '7') && flagUser)
+        return true;
+    else if((grupo == '2' || grupo == '3' || grupo == '6' || grupo == '7') && flagGroup)
+        return true;
+    else if(otros == '2' || otros == '3' || otros == '6' || otros == '7')
+        return true;
+
+    return false;
+}
+/*
+Nos devuelve verdadero o falso si se tienen los permisos para leer 
+*/
+bool permisosDeLectura(int permisos, bool flagUser, bool flagGroup){
+    string stringpermisos = to_string(permisos);
+    int propietario = stringpermisos[0] - '0';
+    int grupo = stringpermisos[1] - '0';
+    int otros = stringpermisos[2] - '0';
+
+    //ESTABLECEMOS LOS PERMISOS ANALIZANDO CARACTER POR CARACTER QUE VIENEN EN EL UGO
+    if((propietario >= 3) && flagUser)
+        return true;
+    else if((grupo >= 3) && flagGroup)
+        return true;
+    else if(otros >= 3)
+        return true;
+
+    return false;
+}
+
+
+//Metodo que crea un Inodo, recibe el tamanio el tipo y los diferentes permisos.
+Tabla_Inodos crearInodo(int size,char type,int perm){
+    Tabla_Inodos inodo ;
+    inodo.i_uid = SesionActual.IDU;
+    inodo.i_gid = SesionActual.IDG;
+    inodo.i_size = size;
+    inodo.i_atime = time(nullptr);
+    inodo.i_ctime = time(nullptr);
+    inodo.i_mtime = time(nullptr);
+    for(int i = 0; i < 15; i++)
+        inodo.i_block[i] = -1;
+    inodo.i_type = type;
+    inodo.i_perm = perm;
+    return inodo;
+}
+
+/*
+Carpeta que retorna 3 valores 1 exitoso, 2 no tiene permisos , 3 flag -p no escrito y no existen los archivos.
+*/
+int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
+    //Declaramos los objetos de las estructuras a utilizar
+    SuperBloque SB;
+    Tabla_Inodos inodo,inodoNuevo;
+    Bloque_Carpetas carpeta, carpetaNueva, carpetaAux;
+    BloqueDeApuntadores apuntadores;
+    vector<string> lista;
+
+    /*
+    Declaramos 3 arreglos char para copiar el pat, obtener el nombre del directorio en la ruta completa, y tambien el nombre base de la carpeta que se creara
+    nueva....
+    */
+    char Pathtmp[500];
+    char directorio[500];
+    char nombreCarpeta[80];
+    strcpy(Pathtmp,path);
+    strcpy(directorio,dirname(Pathtmp));
+    strcpy(Pathtmp,path);
+    strcpy(nombreCarpeta,basename(Pathtmp));
+
+    /*
+    Spliteamos la ruta por los nombres de cada directorio  y los pusheamos por medio de un while en una lista...
+    */
+    char *token = strtok(path,"/");
+    int cont = 0;
+    int numInodo = index;
+    int response = 0;
+
+    while(token != nullptr){
+        cont++;
+        lista.push_back(token);
+        token = strtok(nullptr,"/");
+    }
+
+    /*
+    Posicionamos al inicio del SUPERBLOQUE y lo leemos todo.
+    */
+    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,stream);
+
+    //Si la direccion es de tamanio 1 osea que solamente viene como que una carpeta ej /user o /home
+    if(cont == 1){
+        int Contenido = 0;
+        int bloque = 0;
+        int pointer = 0;
+        int libre = buscarContentLibre(stream,numInodo,inodo,carpeta,apuntadores,Contenido,bloque,pointer);
+        if(libre == 1){
+            if(bloque == 12){//REgistros de bloques directos
+                bool permissions = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+                if(permissions || (SesionActual.IDU == 1 && SesionActual.IDG == 1) ){
+                    char buffer = '1';
+                    int bitInodo = FindBit(stream,'I',fit);
+                    /*
+                    Buscamos el bit disponible para agregar la carpeta al espacio libre que tenga el bloque
+                    
+                    */
+                    carpeta.b_content[Contenido].b_inodo = bitInodo;
+                    strcpy(carpeta.b_content[Contenido].b_name,nombreCarpeta);
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*apuntadores.b_pointers[pointer],SEEK_SET);
+                    fwrite(&carpeta,sizeof(Bloque_Carpetas),1,stream);
+                    /*
+                    Creamos el nuevo inodo de la carpeta...
+                    */
+                    inodoNuevo = crearInodo(0,'0',664);
+                    int bitBloque = FindBit(stream,'B',fit);
+                    inodoNuevo.i_block[0] = bitBloque;
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                    fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                    /*
+                    Posicionamos en el inodo el bitmap y guardamos
+                    */
+                    fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    /*
+                    Creamos el nuevo bloque paara la carpeta! 
+                    */
+                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva.b_content[0].b_inodo = bitInodo;
+                    carpetaNueva.b_content[1].b_inodo = numInodo;
+                    strcpy(carpetaNueva.b_content[0].b_name,".");
+                    strcpy(carpetaNueva.b_content[1].b_name,"..");
+                    /*
+                    Posicionamos y escribimos en el bloque de carpetas
+                    */
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                    fwrite(&carpetaNueva,sizeof(Bloque_Carpetas),1,stream);
+                    /*
+                    Posicionamos y escribimos en el bitmap del bloque.
+                    */
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Sobreescribimos el SB bloque
+                    /*
+                    Ahora le volvemos a dar los valores nuevos al superbloque
+                    */
+                    SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                    SB.s_free_blocks_count = SB.s_free_blocks_count - 1;
+                    SB.s_first_ino = SB.s_first_ino + 1;
+                    SB.s_first_blo = SB.s_first_blo + 1;
+                    /*
+                    Posicionamos y escribimos el superbloque en el disco
+                    */
+                    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                    fwrite(&SB,sizeof(SuperBloque),1,stream);
+                    return 1;
+                }else
+                    return 2;
+            }else if(bloque == 13){
+                //Puntero indirecto doble :( no lo hice
+            }else if(bloque == 14){
+                //Puntero doble indirecto
+            }else{//Sino seran apuntadores directos
+                bool permisos = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+                if(permisos || (SesionActual.IDU == 1 && SesionActual.IDG == 1) ){
+                    char buffer = '1';
+                    int bitInodo = FindBit(stream,'I',fit);
+                    //Agregamos la carpeta al espacio libre en el bloque
+                    carpeta.b_content[Contenido].b_inodo = bitInodo;
+                    strcpy(carpeta.b_content[Contenido].b_name,nombreCarpeta);
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*inodo.i_block[bloque],SEEK_SET);
+                    fwrite(&carpeta,sizeof(Bloque_Carpetas),1,stream);
+                    //Creamos el nuevo inodo
+                    inodoNuevo = crearInodo(0,'0',664);
+                    int bitBloque = FindBit(stream,'B',fit);
+                    inodoNuevo.i_block[0] = bitBloque;
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                    fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                    //Creamos el nuevo bloque carpeta
+                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva.b_content[0].b_inodo = bitInodo;
+                    carpetaNueva.b_content[1].b_inodo = numInodo;
+                    strcpy(carpetaNueva.b_content[0].b_name,".");
+                    strcpy(carpetaNueva.b_content[1].b_name,"..");
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                    fwrite(&carpetaNueva,sizeof(Bloque_Carpetas),1,stream);
+                    //Guardamos los bits en los bitmaps
+                    fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Sobreescribimos el SB bloque
+                    SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                    SB.s_free_blocks_count = SB.s_free_blocks_count - 1;
+                    SB.s_first_ino = SB.s_first_ino + 1;
+                    SB.s_first_blo = SB.s_first_blo + 1;
+                    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                    fwrite(&SB,sizeof(SuperBloque),1,stream);
+                    return 1;
+                }else
+                    return 2;
+            }
+        }else if(libre == 0){//Todos bloques estan llenos
+            bool flag = false;//Primera vez
+            pointer = -1;
+            fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+            fread(&inodo,sizeof(Tabla_Inodos),1,stream);
+            for (int i = 0; i < 15; i++) {
+                if(i == 12){//Apuntador indirecto simple
+                    if(inodo.i_block[i] == -1){//Primera vez
+                        bloque = 12;
+                        flag = true;
+                        break;
+                    }else{
+                        fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[12],SEEK_SET);
+                        fread(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                        for(int j = 0; j < 16; j++){
+                            if(apuntadores.b_pointers[j] == -1){
+                                bloque = 12;
+                                pointer = j;
+                                break;
+                            }
+                        }
+                    }
+                    if(flag || pointer!= -1)
+                        break;
+                }else if(i == 13){
+
+                }else if(i == 14){
+
+                }else{
+                    if(inodo.i_block[i] == -1){
+                        bloque = i;
+                        break;
+                    }
+                }
+            }
+
+            if(bloque == 12 && flag){//Apuntador indirecto simple
+                bool permissions = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+                if(permissions || (SesionActual.IDU == 1 && SesionActual.IDG == 1) ){
+                    char buffer = '1';
+                    char buffer3 = '3';
+                    //Guardamos el bloque en el inodo
+                    int bitBloque = FindBit(stream,'B',fit);//Apuntador
+                    inodo.i_block[bloque] = bitBloque;
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                    fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                    //Escribimos el bit del bloque apuntador en el bitmap
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer3,sizeof(char),1,stream);
+                    //Creamos el bloque de apuntadores como es simple solo se debe crear uno
+                    int bitBloqueCarpeta = FindBit(stream,'B',fit);//Carpeta
+                    apuntadores.b_pointers[0] = bitBloqueCarpeta;
+                    for(int i = 1; i < 16; i++)
+                        apuntadores.b_pointers[i] = -1;
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*bitBloque,SEEK_SET);
+                    fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                    //Creamos la carpeta del apuntador
+                    int bitInodo = FindBit(stream,'I',fit);
+                    carpetaAux = crearBloqueCarpeta();
+                    carpetaAux.b_content[0].b_inodo = bitInodo;
+                    strcpy(carpetaAux.b_content[0].b_name,nombreCarpeta);
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloqueCarpeta,SEEK_SET);
+                    fwrite(&carpetaAux,sizeof(Bloque_Carpetas),1,stream);
+                    //Escribimos el bit del bloque carpeta en el bitmap
+                    fseek(stream,SB.s_bm_block_start + bitBloqueCarpeta,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Creamos el nuevo inodo carpeta
+                    inodoNuevo = crearInodo(0,'0',664);
+                    bitBloque = FindBit(stream,'B',fit);//Carpeta
+                    inodoNuevo.i_block[0] = bitBloque;
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                    fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                    //Escribimos el bit del inodo en el bitmap
+                    fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Creamos el nuevo bloque carpeta
+                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva.b_content[0].b_inodo = bitInodo;
+                    carpetaNueva.b_content[1].b_inodo = numInodo;
+                    strcpy(carpetaNueva.b_content[0].b_name,".");
+                    strcpy(carpetaNueva.b_content[1].b_name,"..");
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                    fwrite(&carpetaNueva,sizeof(Bloque_Carpetas),1,stream);
+                    //Guardamos el bit en el bitmap de bloques
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Sobreescribimos el SB bloque
+                    SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                    SB.s_free_blocks_count = SB.s_free_blocks_count - 3;
+                    SB.s_first_ino = SB.s_first_ino + 1;
+                    SB.s_first_blo = SB.s_first_blo + 3;
+                    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                    fwrite(&SB,sizeof(SuperBloque),1,stream);
+                    return 1;
+                }else
+                    return 2;
+            }else if(bloque == 12 && !flag){
+                char buffer = '1';
+                //Escribir el numero de bloque en el bloque de apuntadores
+                int bitBloque = FindBit(stream,'B',fit);
+                apuntadores.b_pointers[pointer] = bitBloque;
+                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[12],SEEK_SET);
+                fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
+                //Creamos el bloque auxiliar
+                int bitInodo = FindBit(stream,'I',fit);
+                carpetaAux = crearBloqueCarpeta();
+                carpetaAux.b_content[0].b_inodo = bitInodo;
+                strcpy(carpetaAux.b_content[0].b_name,nombreCarpeta);
+                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                fwrite(&carpetaAux,sizeof(Bloque_Carpetas),1,stream);
+                //Escribimos el bit del bloque carpeta en el bitmap
+                fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                fwrite(&buffer,sizeof(char),1,stream);
+                //Creamos el nuevo inodo carpeta
+                inodoNuevo = crearInodo(0,'0',664);
+                inodoNuevo.i_uid = SesionActual.IDU;
+                inodoNuevo.i_gid = SesionActual.IDG;
+                bitBloque = FindBit(stream,'B',fit);//Carpeta
+                inodoNuevo.i_block[0] = bitBloque;
+                fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                //Escribimos el bit del inodo en el bitmap
+                fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                fwrite(&buffer,sizeof(char),1,stream);
+                //Creamos el nuevo bloque carpeta
+                carpetaNueva = crearBloqueCarpeta();
+                carpetaNueva.b_content[0].b_inodo = bitInodo;
+                carpetaNueva.b_content[1].b_inodo = numInodo;
+                strcpy(carpetaNueva.b_content[0].b_name,".");
+                strcpy(carpetaNueva.b_content[1].b_name,"..");
+                fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                fwrite(&carpetaNueva,sizeof(Bloque_Carpetas),1,stream);
+                //Guardamos el bit en el bitmap de bloques
+                fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                fwrite(&buffer,sizeof(char),1,stream);
+                //Sobreescribimos el SB bloque
+                SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                SB.s_free_blocks_count = SB.s_free_blocks_count - 2;
+                SB.s_first_ino = SB.s_first_ino + 1;
+                SB.s_first_blo = SB.s_first_blo + 2;
+                fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                fwrite(&SB,sizeof(SuperBloque),1,stream);
+                return 1;
+            }
+            else if(bloque == 13){//Apuntador indirecto doble
+
+            }else if(bloque == 14){//Apuntador indirecto triple
+
+            }else{//Apuntadores directos
+                bool permissions = permisosDeEscritura(inodo.i_perm,(inodo.i_uid == SesionActual.IDU),(inodo.i_gid == SesionActual.IDG));
+                if(permissions || (SesionActual.IDU == 1 && SesionActual.IDG == 1) ){
+                    char buffer = '1';
+                    int bitBloque = FindBit(stream,'B',fit);
+                    inodo.i_block[bloque] = bitBloque;
+                    //Sobreescribimos el inodo
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*numInodo,SEEK_SET);
+                    fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
+                    //Bloque carpeta auxiliar
+                    int bitInodo = FindBit(stream,'I',fit);
+                    carpetaAux = crearBloqueCarpeta();
+                    carpetaAux.b_content[0].b_inodo = bitInodo;
+                    strcpy(carpetaAux.b_content[0].b_name,nombreCarpeta);
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                    fwrite(&carpetaAux,sizeof(Bloque_Carpetas),1,stream);
+                    //Escribimos el bit en el bitmap de blqoues
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Creamos el nuevo inodo
+                    inodoNuevo = crearInodo(0,'0',664);
+                    bitBloque = FindBit(stream,'B',fit);
+                    inodoNuevo.i_block[0] = bitBloque;
+                    fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
+                    fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
+                    //Escribimos el bit en el bitmap de inodos
+                    fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Creamos el nuevo bloque carpeta
+                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva.b_content[0].b_inodo = bitInodo;
+                    carpetaNueva.b_content[1].b_inodo = numInodo;
+                    strcpy(carpetaNueva.b_content[0].b_name,".");
+                    strcpy(carpetaNueva.b_content[1].b_name,"..");
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
+                    fwrite(&carpetaNueva,sizeof(Bloque_Carpetas),1,stream);
+                    //Guardamos el bit en el bitmap de bloques
+                    fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
+                    fwrite(&buffer,sizeof(char),1,stream);
+                    //Sobreescribimos el SB bloque
+                    SB.s_free_inodes_count = SB.s_free_inodes_count - 1;
+                    SB.s_free_blocks_count = SB.s_free_blocks_count - 2;
+                    SB.s_first_ino = SB.s_first_ino + 1;
+                    SB.s_first_blo = SB.s_first_blo + 2;
+                    fseek(stream,SesionActual.PosicionInicialSB,SEEK_SET);
+                    fwrite(&SB,sizeof(SuperBloque),1,stream);
+                    return 1;
+                }else
+                    return 2;
+            }
+
+        }
+    }else{//Es un directorio '/home/usac/archivos'
+        //Verificar que exista el directorio
+        int existe = buscarCarpetaArchivo(stream,directorio);
+        if(existe == -1){
+            if(P){
+                int index = 0;
+                string aux = "";
+                //Crear posibles carpetas inexistentes
+                for(int i = 0; i < cont; i++){
+                    aux += "/"+lista.at(i);
+                    char dir[500];
+                    char auxDir[500];
+                    strcpy(dir,aux.c_str());
+                    strcpy(auxDir,aux.c_str());
+                    int carpeta = buscarCarpetaArchivo(stream,dir);
+                    if(carpeta == -1){
+                        response = nuevaCarpeta(stream,fit,false,auxDir,index);
+                        if(response == 2)
+                            break;
+                        strcpy(auxDir,aux.c_str());
+                        index = buscarCarpetaArchivo(stream,auxDir);
+                    }else
+                        index = carpeta;
+                }
+            }else
+                return 3;
+        }else{//Solo crear la carpeta en el directorio
+            char dir[100] = "/";
+            strcat(dir,nombreCarpeta);
+            return nuevaCarpeta(stream,fit,false,dir,existe);
+        }
+    }
+
+    return response;
+}
+
+/*
+Funcion que retorna una carpeta que se llena automaticamente con -1
+*/
+Bloque_Carpetas crearBloqueCarpeta(){
+    Bloque_Carpetas carpeta;
+
+    for(int i = 0; i < 4; i++){
+        strcpy(carpeta.b_content[i].b_name,"");
+        carpeta.b_content[i].b_inodo = -1;
+    }
+
+    return carpeta;
+}
+
+/*
+funcion que devuelve los directorios delimitados por el separador /
+*/
+string getDirectorio(string aux){
+    string delimiter = "/";
+    size_t pos = 0;
+    string res = "";
+    while((pos = aux.find(delimiter))!=string::npos){
+        res += aux.substr(0,pos)+"/";
+        aux.erase(0,pos + delimiter.length());
+    }
+    return res;
+}
+
+/*
+Este metodo es el principal para crear carpetas, recibe el nombre del directorio como tal, la ruta donde se creara y la bandera P Por si se desea crear las carpetas que no existen
+*/
+void MKDIR(string nameSinruta,string ruta,bool valP){
+    string name = nameSinruta;
+    if(name.length() <= 11){
+        if(SesionActiva){
+            int CarpetaCreadaConExito = crearCarpeta(ruta,valP);
+            if(CarpetaCreadaConExito == 0)
+                cout << "\033[91m La carpeta ya existe!! \033[0m" << endl;
+            else if(CarpetaCreadaConExito == 1){
+                if(SesionActual.FS == 3){
+                    char aux[500];
+                    char comando[8];
+                    char Contenido[5];
+                    strcpy(aux,ruta.c_str());
+                    strcpy(comando,"mkdir");
+                    strcpy(Contenido,"null");
+                    SaveJournaling(comando,1,664,aux,Contenido);
+                }
+                cout << "\033[96m Carpeta creada con exito :D \033[0m" << endl;
+            }else if(CarpetaCreadaConExito == 2)
+                cout << "\033[91m Error: no se tienen permisos de escritura \033[0m" << endl;
+            else if(CarpetaCreadaConExito == 3){
+                cout << "\033[91m El directorio del path no existe si quiere crearlo agrege el comando -P \033[0m" << endl;
+            }
+        }else
+            cout << "\033[91m Error: Se necesita iniciar sesion para ejecutar el comando \033[0m" << endl;
+    }
+}
+
+/*
+Metodo que abre el archivo de la ruta donde se encuentra el disco y se poisicona en el SUPERBLOQUE, si existe retorna 0 sino se redirije hacia la nueva carpeta a crearla.
+*/
+int crearCarpeta(string path, bool p){
+    FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
+
+    SuperBloque SB;
+    fseek(FileDisk,SesionActual.PosicionInicialSB,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+
+    string aux = path;
+    char Pathtemp[500];
+    strcpy(Pathtemp,aux.c_str());
+    int existe = buscarCarpetaArchivo(FileDisk,Pathtemp);
+    strcpy(Pathtemp,aux.c_str());
+    int retorno = -1;
+
+    if(existe != -1)
+        retorno = 0;
+    else
+        retorno = nuevaCarpeta(FileDisk,SesionActual.fit,p,Pathtemp,0);
+
+    fclose(FileDisk);
+
+    return retorno;
+}
+
+
+/*
+Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 
+*/
 int main(int argc, char const *argv[])
 {
     cout<<"\033[92m********************************************"<<endl;

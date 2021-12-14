@@ -313,11 +313,11 @@ string EliminarComillasYreemplazarEspacios(string cadena){
     if(e=='\"'){//Si viene una comilla en el primer espacio las vamos a eliminar
         
         retorno = EliminarComillas(cadena);//Eliminamos comillas
-        cout<<retorno<<endl;
+
         return retorno;//Sino retornamos solamente sin comillas
 
     }else{//Si no vienen comillas retornamos
-        cout<<retorno<<endl;
+
         return retorno;
     }
     
@@ -404,11 +404,11 @@ void EjecutarComando(char comando[200]){
                 vector<string> aux;
                 aux = Split(lineSplit[1],"~:~");
                 if(aux[0] == "-PATH"){
-                    dir = path+aux[1];
-                    string auxiliare = dir;
-                    string path;
-                    path = EliminarComillasYreemplazarEspacios(auxiliare);
-                    borrardisco(path); 
+                    string auxiliare = aux[1];
+                    string pathx;
+                    pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                    dir = path +pathx;
+                    borrardisco(dir); 
                 }           
             }else if(lineSplit[0]=="FDISK"){
                 int sizeerror,fiterror,uniterror,typeerror =0;

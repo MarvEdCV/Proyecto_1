@@ -3995,9 +3995,6 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
     }        
 }
 
-
-
-
 string ObtenerExt(string direccion){
     string aux = direccion;
     string delimiter = ".";
@@ -4009,16 +4006,15 @@ string ObtenerExt(string direccion){
 }
 
 void GraficarMBR(string direccion, string destino, string extension){
-    string auxDir = direccion;
     FILE *FileDis;
     FILE *FileGraphDot;
     //Empezamos a llenar el archivo para la grafica del mbr
-    if((FileDis = fopen(auxDir.c_str(),"r"))){
+    if((FileDis = fopen(direccion.c_str(),"r"))){
         FileGraphDot = fopen("grafica.dot", "w");
         fprintf(FileGraphDot,"digraph G{ \n");
         fprintf(FileGraphDot,"subgraph cluster_0{\n label=\"REPORTE MBR\"");
-        fprintf(FileGraphDot,"\ntbl[shape=box3d,label=<\n");
-        fprintf(FileGraphDot,"<table border=\'0\' cellborder=\'1\' cellspacing=\'0\' width=\'300\'  height=\'200\' >\n");//Establecemos con html el borde 
+        fprintf(FileGraphDot,"\nrepmbr[shape=box3d,label=<\n");
+        fprintf(FileGraphDot,"<table border=\'25\' cellborder=\'0\' cellspacing=\'15\' width=\'300\'  height=\'200\' >\n");//Establecemos con html el borde 
         fprintf(FileGraphDot, "<tr>  <td width=\'150\'> <b>Atributo MBR</b> </td> <td width=\'150\'> <b>Valor</b> </td>  </tr>\n");
         MBR masterBoot;
         fseek(FileDis,0,SEEK_SET);
@@ -4082,8 +4078,8 @@ void GraficarMBR(string direccion, string destino, string extension){
                     Si el estado del EBR es diferene de -1 repetimos 
                     */
                     fprintf(FileGraphDot,"subgraph cluster_%d{\n label=\"EBR_Numero_%d\"\n",index_ebr,index_ebr);
-                    fprintf(FileGraphDot,"\ntbl_%d[shape=box3d,label=<\n ",index_ebr);//agregamos el numero del ebr a cada nodo
-                    fprintf(FileGraphDot, "<table border=\'0\' cellborder=\'1\' cellspacing=\'0\'  width=\'300\' height=\'160\' >\n ");
+                    fprintf(FileGraphDot,"\nrepmbr_%d[shape=box3d,label=<\n ",index_ebr);//agregamos el numero del ebr a cada nodo
+                    fprintf(FileGraphDot, "<table border=\'25\' cellborder=\'1\' cellspacing=\'15\'  width=\'300\' height=\'160\' >\n ");
                     fprintf(FileGraphDot, "<tr>  <td width=\'150\'><b>Atributo EBR</b></td> <td width=\'150\'><b>Valor</b></td>  </tr>\n");
                     char status[3];
                     if(extendedBoot.part_status == '0')//copiamos estado

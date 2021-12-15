@@ -95,6 +95,7 @@ void GraficarJOURNALING(string ,string ,string ,string );
 void generarDotJOURNALING(string ,string , string ,int );
 void generarDotBLOCK(string , string , string , int , int , int );
 void generarDotSB(string , string , string , int );
+void generarDotTree(string , string , string , int );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -3982,7 +3983,7 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             }else if(NombreReporte == "BM_BLOCH"){
                 cout<<"Graficare bm_block :D"<<endl;
             }else if(NombreReporte == "TREE"){
-                cout<<"Graficare tree :D"<<endl;
+                GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "SB"){
                 GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "FILE"){
@@ -4011,7 +4012,7 @@ void GraficarMBR(string direccion, string destino, string extension){
     FILE *FileGraphDot;
     //Empezamos a llenar el archivo para la grafica del mbr
     if((FileDis = fopen(direccion.c_str(),"r"))){
-        FileGraphDot = fopen("MBR.dot", "w");
+        FileGraphDot = fopen("DotReportes/MBR.dot", "w");
         fprintf(FileGraphDot,"digraph G{ \n");
         fprintf(FileGraphDot,"subgraph cluster_0{\n label=\"REPORTE MBR\"");
         fprintf(FileGraphDot,"\nrepmbr[shape=box3d,label=<\n");
@@ -4107,7 +4108,7 @@ void GraficarMBR(string direccion, string destino, string extension){
         fprintf(FileGraphDot,"}\n");//cerramos el dot
         fclose(FileGraphDot);//cerramos el file del dot
         fclose(FileDis);//cerramos archivo del disco
-        string comando = "dot -T"+extension+" MBR.dot -o "+destino;
+        string comando = "dot -T"+extension+" DotReportes/MBR.dot -o "+destino;
         system(comando.c_str());//ejecutamos el comando para crear el dot y ejecutarlo 
         cout << "\033[96m Reporte MBR generado con éxito :D \033[0m " << endl;
     }
@@ -4124,7 +4125,7 @@ void GraficarDISCO(string PathDisk,string PathDestino, string extension ){
         /*
         Abrimos el archivo en Disk.dot en modo escritura, y empezamos el encabezado del dot a;adiendo el inicio de la tabla para el reporte
         */
-        FileGraphDot = fopen("Disk.dot","w");
+        FileGraphDot = fopen("DotReportes/Disk.dot","w");
         fprintf(FileGraphDot,"digraph G{\n\n");
         fprintf(FileGraphDot, "repdisk[\nshape=box3d\n label=<\n");
         fprintf(FileGraphDot, "<table border=\'10\' cellborder=\'1\' width=\'600\' height=\"200\" color=\'#20B2AA\'>\n");
@@ -4248,7 +4249,7 @@ void GraficarDISCO(string PathDisk,string PathDestino, string extension ){
         fprintf(FileGraphDot,"</tr>\n</table> \n>];\n\n}");//Cerramos etiquetas principales del dot
         fclose(FileGraphDot);//Cerramos archivo dot luego de escribirlo
         fclose(FileDisk);//Cerramos el archivo del disco
-        string comando = "dot -T"+extension+" Disk.dot -o "+PathDestino;
+        string comando = "dot -T"+extension+" DotReportes/Disk.dot -o "+PathDestino;
         system(comando.c_str());//Ejecutamos el .dot para crear la imagen.
         cout << "\033[96m Reporte DISCO generado con éxito :D \033[0m  " << endl;
     }else{
@@ -4277,6 +4278,8 @@ void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,str
         fseek(FileDisk,mbr.mbr_partition[Numero].part_start,SEEK_SET);
         if(operacion == "SB"){
             generarDotSB(PathDisk,PathDestino,extension,mbr.mbr_partition[Numero].part_start);
+        }else if(operacion == "TREE"){
+            generarDotTree(PathDisk,PathDestino,extension,mbr.mbr_partition[Numero].part_start);
         }
         fread(&SB,sizeof(SuperBloque),1,FileDisk);//Leemos el SB bloque para mandar sus atributos al metodo que genera el dot
         fclose(FileDisk);//Cerramos el archivo del disco
@@ -4299,6 +4302,9 @@ void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,str
             if(operacion=="SB"){
                 int inicio = static_cast<int>(ftell(FileDisk));
                 generarDotSB(PathDisk,PathDestino,extension,inicio);
+            }else if(operacion=="TREE"){
+                int inicio = static_cast<int>(ftell(FileDisk));
+                generarDotTree(PathDisk,PathDestino,extension,inicio);
             }
             fread(&SB,sizeof(SuperBloque),1,FileDisk);
             fclose(FileDisk);
@@ -4324,7 +4330,7 @@ void generarDotINODE(string PathDisk, string PathDestino, string extension,int b
     /*
     Creamos el archivo dot donde generaremos el codigo..
     */
-    FILE *GraphDot = fopen("Inode.dot","w");
+    FILE *GraphDot = fopen("DotReportes/Inode.dot","w");
     fprintf(GraphDot,"digraph G{\n\n");
     /*
     Se repetira mientras El inicio del bitmap de inodos sea menor a el inicio del bitmap de bloques
@@ -4377,7 +4383,7 @@ void generarDotINODE(string PathDisk, string PathDestino, string extension,int b
 
     fclose(FileDisk);
 
-    string comando = "dot -T"+extension+" Inode.dot -o "+PathDestino;
+    string comando = "dot -T"+extension+" DotReportes/Inode.dot -o "+PathDestino;
     system(comando.c_str());
     cout << "\033[96m Reporte Inodos generado con éxito :D \033[0m   " << endl;
 }
@@ -4422,7 +4428,7 @@ void generarDotJOURNALING(string direccion,string destino, string extension,int 
     /*
     Creamos el archivo que almacenara el dot y tambien lo ejecutara para exportarlo en imagen
     */
-    FILE *GraphDot = fopen("Journaling.dot","w");
+    FILE *GraphDot = fopen("DotReportes/Journaling.dot","w");
     /*
     Creamos el inicio del archivo y empezamos a hacer la tabla 
     */
@@ -4456,7 +4462,7 @@ void generarDotJOURNALING(string direccion,string destino, string extension,int 
 
     fclose(FileDisk);
 
-    string comando = "dot -T"+extension+" Journaling.dot -o "+destino;
+    string comando = "dot -T"+extension+" DotReportes/Journaling.dot -o "+destino;
     system(comando.c_str());
     cout << "\033[96m Reporte Journal generado con éxito :D \033[0m " << endl;
 }
@@ -4481,7 +4487,7 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
     /*
     Abrimos el archivo donde crearemos el dot 
     */
-    FILE *GraphDot = fopen("Block.dot","w");
+    FILE *GraphDot = fopen("DotReportes/Block.dot","w");
     fprintf(GraphDot,"digraph G{\n\n");
     /*
     Se repetira mientras el inicio del bitmap sea menor al bit inicial del inodo
@@ -4542,7 +4548,7 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
 
     fclose(FileDisk);
 
-    string comando = "dot -T"+extension+" Block.dot -o "+PathDestino;
+    string comando = "dot -T"+extension+" DotReportes/Block.dot -o "+PathDestino;
     system(comando.c_str());
     cout << "\033[96m Reporte Block generado con éxito :D \033[0m " << endl;
 }
@@ -4551,7 +4557,7 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
 
 void generarDotSB(string direccion, string destino, string extension, int start_super){
     /*
-    Abrimos el disco y creamos un super bloque
+    Abrimos el disco y creamos un SB bloque
     */
     FILE* FileDisk = fopen(direccion.c_str(),"r");
 
@@ -4565,7 +4571,7 @@ void generarDotSB(string direccion, string destino, string extension, int start_
     /*
     Creamos el archivo que almacenara eldot que generara el reporte ya que ya tenemos acceso para leer los datos...
     */
-    FILE *GraphDot = fopen("SuperBloque.dot","w");
+    FILE *GraphDot = fopen("DotReportes/SuperBloque.dot","w");
     fprintf(GraphDot,"digraph G{\n");
     fprintf(GraphDot, "    nodo [shape=box3d, label=<");
     fprintf(GraphDot, "   <table border=\'10\' cellborder='0\' cellspacing=\'2\' bgcolor=\"cornflowerblue\">");
@@ -4601,10 +4607,218 @@ void generarDotSB(string direccion, string destino, string extension, int start_
 
     fclose(FileDisk);
 
-    string comando = "dot -T"+extension+" SuperBloque.dot -o "+destino;
+    string comando = "dot -T"+extension+" DotReportes/SuperBloque.dot -o "+destino;
     system(comando.c_str());
     cout << "\033[96m Reporte SuperBloque generado con éxito :D \033[0m " << endl;
 }
+
+void generarDotTree(string direccion, string destino, string extension, int start_super){
+    FILE *FileDisk = fopen(direccion.c_str(),"r");
+    SuperBloque SB;
+    Tabla_Inodos inodo;
+    Bloque_Carpetas carpeta;
+    Bloque_Archivos archivo;
+    BloqueDeApuntadores Puntero;
+    /*
+    Se apunta a la posicion de donde empieza el superbloque de la particion
+    */
+    fseek(FileDisk,start_super,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+
+
+    int InicioSB = SB.s_bm_inode_start;
+    int contador = 0;
+
+    char buffer;
+    /*
+    Abrimos el archivo donde crearemos el dot del arbol
+    */
+    FILE *GraphDot = fopen("DotReportes/Tree.dot", "w");
+    fprintf(GraphDot, "digraph G{\n\n");
+    fprintf(GraphDot, "    rankdir=\"LR\" \n");
+
+    /*
+    Empezamos a recorrer el super bloque para crear los inodos
+    */
+    while(InicioSB < SB.s_bm_block_start){
+        /*
+        Apuntamos donde epieza cada inodo mmas la el recorrido del inoco
+        */
+        fseek(FileDisk,SB.s_bm_inode_start + contador,SEEK_SET);
+        buffer = static_cast<char>(fgetc(FileDisk));
+        InicioSB++;
+        int port = 0;
+        /*
+        Si el buffer nos retorna 1 es porque vamos a crear las tablas de inodos y tambien los bloques de carpetas
+        */
+        if(buffer == '1'){
+            /*
+            Posicionamos el archivo en el inicio de la tabla de inodos y lo leemos completo
+            */
+            fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*contador,SEEK_SET);
+            fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            /*
+            Ya que lo tenemos leido escribimos todos los datos del inodo
+            */
+            fprintf(GraphDot, "    inodo_%d [ shape=box3d  label=<\n",contador);
+            fprintf(GraphDot, "   <table bgcolor=\"#F25C3B\" border=\'0\' >");
+            fprintf(GraphDot, "    <tr> <td colspan=\'2\'><b> Inodo %d</b></td></tr>\n",contador);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_uid </td> <td bgcolor=\"#A3A2AE\"> %d </td>  </tr>\n",inodo.i_uid);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_gid </td> <td bgcolor=\"#A3A2AE\"> %d </td>  </tr>\n",inodo.i_gid);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_size </td><td bgcolor=\"#A3A2AE\"> %d </td> </tr>\n",inodo.i_size);
+            struct tm *tm;
+            char fecha[100];
+            tm=localtime(&inodo.i_atime);
+            strftime(fecha,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_atime </td> <td bgcolor=\"#A3A2AE\"> %s </td> </tr>\n",fecha);
+            tm=localtime(&inodo.i_ctime);
+            strftime(fecha,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_ctime </td> <td bgcolor=\"#A3A2AE\"> %s </td> </tr>\n",fecha);
+            tm=localtime(&inodo.i_mtime);
+            strftime(fecha,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_mtime </td> <td bgcolor=\"#A3A2AE\"> %s </td> </tr>\n",fecha);
+            for(int b = 0; b < 15; b++){//Apuntadores directos
+                fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_block_%d </td> <td bgcolor=\"#A3A2AE\" port=\"f%d\"> %d </td></tr>\n",port,b,inodo.i_block[b]);
+                port++;
+            }
+            //Terminamos de llenar los datos d inodos
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_type </td> <td bgcolor=\"#A3A2AE\"> %c </td>  </tr>\n",inodo.i_type);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#943622\"> i_perm </td> <td bgcolor=\"#A3A2AE\"> %d </td>  </tr>\n",inodo.i_perm);
+            fprintf(GraphDot, "   </table>>]\n\n");
+            /*
+            Si hay carpetas relacionadas con cada inodo las recorremos por si algun apuntador apunta hacia alguna carpeta
+            */
+            for (int j = 0; j < 15; j++) {//Recorremos los apuntadores
+                port = 0;
+                if(inodo.i_block[j] != -1){//Media vez el bloque este apuntando a algo lo leeremos...!=-1
+                    /*
+                    apuntamos al bloque que apuntamos
+                    */
+                    fseek(FileDisk,SB.s_bm_block_start + inodo.i_block[j],SEEK_SET);
+                    buffer = static_cast<char>(fgetc(FileDisk));
+                    if(buffer == '1'){//Si apuntamos a bloques de carpetas 
+                        /*
+                        Apuntamos el archivo al inicio del bloque de carpeta y leemos todo el bloque
+                        */
+                        fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*inodo.i_block[j],SEEK_SET);
+                        fread(&carpeta,sizeof(Bloque_Carpetas),1,FileDisk);
+                        /*
+                        Escribimos el bloque de carpetas 
+                        */
+                        fprintf(GraphDot, "    bloque_%d [shape=box3d  label=< \n",inodo.i_block[j]);
+                        fprintf(GraphDot, "   <table bgcolor=\"#14E350\" border=\'0\'>\n");
+                        fprintf(GraphDot, "    <tr> <td colspan=\'2\'><b>Bloque de Carpeta %d</b></td></tr>\n",inodo.i_block[j]);
+                        fprintf(GraphDot, "    <tr> <td bgcolor=\"#36BA15\"> b_name </td> <td bgcolor=\"#36BA15\"> b_inode </td></tr>\n");
+                        for(int c = 0;c < 4; c++){//Como este tiene 4 columnas recorremos las 4 . .. etc.
+                            fprintf(GraphDot, "    <tr> <td bgcolor=\"#A3A2AE\" > %s </td> <td bgcolor=\"#A3A2AE\"  port=\"f%d\"> %d </td></tr>\n",carpeta.b_content[c].b_name,port,carpeta.b_content[c].b_inodo);
+                            port++;
+                        }
+                        fprintf(GraphDot, "   </table>>]\n\n");
+                        /*
+                        Si tiene relaciones en los apuntadores tambien impimimos el contenido del bloque..
+                        */
+                        for(int c = 0; c < 4; c++){
+                            if(carpeta.b_content[c].b_inodo !=-1){
+                                if(strcmp(carpeta.b_content[c].b_name,".")!=0 && strcmp(carpeta.b_content[c].b_name,"..")!=0)
+                                    fprintf(GraphDot, "    bloque_%d:f%d -> inodo_%d;\n",inodo.i_block[j],c,carpeta.b_content[c].b_inodo);
+                            }
+                        }
+                    }else if(buffer == '2'){
+                        /*
+                        Si el buffer retorna 2 es porque vamos a leer bloque de archivos, entonces lo leemos, lo primero que hacemos es pocisionarnos en el inicio y leemos el bloque de archivos
+                        */
+                        fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*inodo.i_block[j],SEEK_SET);
+                        fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                        fprintf(GraphDot, "    bloque_%d [shape=box3d  label=< \n",inodo.i_block[j]);
+                        fprintf(GraphDot, "   <table border=\'0\' bgcolor=\"#120BE8\">\n");
+                        fprintf(GraphDot, "    <tr> <td> <b>Bloque de Archivo %d</b></td></tr>\n",inodo.i_block[j]);
+                        fprintf(GraphDot, "    <tr> <td bgcolor=\"#A3A2AE\"> %s </td></tr>\n",archivo.b_content);
+                        fprintf(GraphDot, "   </table>>]\n\n");
+                    }else if(buffer == '3'){
+                        /*
+                        Si el buffer retorna 3 es porque es un bloque de apuntadores, entonces nos posciioamos y leemos el bloque para posteriormetne escribirlo
+                        */
+                        fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[j],SEEK_SET);
+                        fread(&Puntero,sizeof(BloqueDeApuntadores),1,FileDisk);
+                        fprintf(GraphDot, "    bloque_%d [shape=box3d  label=< \n",inodo.i_block[j]);
+                        fprintf(GraphDot, "   <table border=\'0\' bgcolor=\"#8C89D8\">\n");
+                        fprintf(GraphDot, "    <tr> <td> <b>Bloque de Apuntadores %d</b></td></tr>\n",inodo.i_block[j]);
+                        for(int a = 0; a < 16; a++){
+                            fprintf(GraphDot, "    <tr> <td bgcolor=\"#A3A2AE\" port=\"f%d\">%d</td> </tr>\n",port,Puntero.b_pointers[a]);
+                            port++;
+                        }
+                        fprintf(GraphDot, "   </table>>]\n\n");
+                        /*
+                        Recorremos los bloque de apuntadores y hacemos la logica de recorrer si existen bloques de carpetas o archivos e imprimimos el resultado..
+                        */
+                        for (int x = 0; x < 16; x++) {
+                            port = 0;
+                            if(Puntero.b_pointers[x] != -1){
+                                fseek(FileDisk,SB.s_bm_block_start + Puntero.b_pointers[x],SEEK_SET);
+                                buffer = static_cast<char>(fgetc(FileDisk));
+                                if(buffer == '1'){
+                                    fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*Puntero.b_pointers[x],SEEK_SET);
+                                    fread(&carpeta,sizeof(Bloque_Carpetas),1,FileDisk);
+                                    fprintf(GraphDot, "    bloque_%d [shape=box3d  label=< \n",Puntero.b_pointers[x]);
+                                    fprintf(GraphDot, "   <table border=\'0\' bgcolor=\"#14E350\" >\n");
+                                    fprintf(GraphDot, "    <tr> <td colspan=\'2\'> <b>Bloque de Carpetas %d</b> </td></tr>\n",Puntero.b_pointers[x]);
+                                    fprintf(GraphDot, "    <tr> <td bgcolor=\"#36BA15\"> b_name </td> <td bgcolor=\"#36BA15\"> b_inode </td></tr>\n");
+                                    for(int c = 0;c < 4; c++){
+                                        fprintf(GraphDot, "    <tr> <td bgcolor=\"#A3A2AE\"> %s </td> <td bgcolor=\"#A3A2AE\" port=\"f%d\"> %d </td></tr>\n",carpeta.b_content[c].b_name,port,carpeta.b_content[c].b_inodo);
+                                        port++;
+                                    }
+                                    fprintf(GraphDot, "   </table>>]\n\n");
+                                    /*
+                                    En este momento que recorremos los apuntadores, relacionamos los inodos con los bloques para asi ir creando el arbol 
+                                    */
+                                    for(int c = 0; c < 4; c++){
+                                        if(carpeta.b_content[c].b_inodo !=-1){
+                                            if(strcmp(carpeta.b_content[c].b_name,".")!=0 && strcmp(carpeta.b_content[c].b_name,"..")!=0)
+                                                fprintf(GraphDot, "    bloque_%d:f%d -> inodo_%d;\n",Puntero.b_pointers[x],c,carpeta.b_content[c].b_inodo);
+                                        }
+                                    }
+                                }else if(buffer == '2'){
+                                    fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Archivos))*Puntero.b_pointers[x],SEEK_SET);
+                                    fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                                    fprintf(GraphDot, "    bloque_%d [shape=box3d  label=< \n",Puntero.b_pointers[x]);
+                                    fprintf(GraphDot, "   <table border=\'0\' bgcolor=\"#120BE8\">\n");
+                                    fprintf(GraphDot, "    <tr> <td> <b>Bloque de Archivo %d</b></td></tr>\n",Puntero.b_pointers[x]);
+                                    fprintf(GraphDot, "    <tr> <td bgcolor=\"#A3A2AE\"> %s </td></tr>\n",archivo.b_content);
+                                    fprintf(GraphDot, "   </table>>]\n\n");
+                                }else if(buffer == '3'){
+
+                                }
+                            }
+                        }
+
+                        /*
+                        Escribimos las relaciones de los punteros con los bloques
+                        */
+                        for(int b = 0; b < 16; b++){
+                            if(Puntero.b_pointers[b] != -1)
+                                fprintf(GraphDot, "    bloque_%d:f%d -> bloque_%d;\n",inodo.i_block[j],b,Puntero.b_pointers[b]);
+                        }
+                    }
+                    /*
+                    Relacionamos inodos con bloques
+                    */
+                    fprintf(GraphDot, "    inodo_%d:f%d -> bloque_%d; \n",contador,j,inodo.i_block[j]);
+                }
+            }
+        }
+        contador++;
+    }
+
+    fprintf(GraphDot,"\n\n}");
+    fclose(GraphDot);
+
+    fclose(FileDisk);
+
+    string comando = "dot -T"+extension+" DotReportes/Tree.dot -o "+destino;
+    system(comando.c_str());
+    cout << "Reporte Tree generado con exito " << endl;
+}
+
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 
 */

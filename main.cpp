@@ -82,6 +82,10 @@ string getDirectorio(string );
 void MKDIR(string ,string ,bool );
 int crearCarpeta(string , bool p);
 
+
+void GraficarMBR(string , string , string );
+void REPORTES(string ,string ,string ,string );
+string getExtension(string );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -747,6 +751,41 @@ void EjecutarComando(char comando[200]){
                     }
                 }
                 MKDIR(name,path,p);            
+            }else if(lineSplit[0] == "REP"){
+                bool p =false;
+                string path="";
+                string name="";
+                string id="";
+                string ruta="";
+                vector<string> auxiliar;
+                vector<string> auxiliarSinCastear,namepath;
+                for(size_t i=1; i < lineSplit.size(); i++){//Repetiremos tantas veces desde 1 hasta que termine cada uno de los comandos(se empieza de 1 ya que no tomamos en cuenta el comando MKDISK)
+                    auxiliar = Split(lineSplit[i],"~:~");
+                    auxiliarSinCastear = Split(lineSplitSinCasteo[i],"~:~");
+                    if(auxiliar[0] == "-NAME"){
+                       /*string auxiliare = auxiliarSinCastear[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                        path = pathx;
+                        namepath = Split(path,"/");
+                        name = namepath[namepath.size()-1];*/
+                        name = auxiliar[1];
+
+                    }else if(auxiliar[1] == "-PATH"){
+                        string auxiliare = auxiliarSinCastear[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                        path = pathx;
+                    }else if(auxiliar[1] == "-ID"){
+                        id = EliminarComillasYreemplazarEspacios(auxiliarSinCastear[1]);                       
+                    }else if(auxiliar[1] == "-RUTA"){
+                       string auxiliare = auxiliarSinCastear[1];
+                        string pathx;
+                        pathx = EliminarComillasYreemplazarEspacios(auxiliare);
+                        ruta = pathx;
+                    }
+                }
+                REPORTES(name,path,id,ruta);          
             }
     }
 }
@@ -2704,9 +2743,18 @@ int byteInodoBloque(FILE *archivo,int pos, char tipo){
 
 
 void MKFILE(string ruta,string Cont,int tamanio,bool P,string name){
+    /*
+    cout<<"ruta:"<<ruta<<endl;
+    cout<<"cont:"<<Cont<<endl;
+    cout<<"tamanio:"<<tamanio<<endl;
+    cout<<"-P:"<<P<<endl;
+    cout<<"name:"<<name<<endl;
+    */
     if(name.length() <= 11){
                 if(SesionActiva){
+                    cout<<"entre al mfile sesion atvia"<<endl;
                     int ArchivoCreadoConExito = crearArchivo(ruta,P,tamanio,Cont);
+                    //cout<<ArchivoCreadoConExito<<endl;
                     if(ArchivoCreadoConExito == 1){//Si el metodo nos devuelve que si se creo con exito
                         if(SesionActual.FS == 3){//Si el disco es EXT3
                             char tmp[500];
@@ -3365,7 +3413,7 @@ bool permisosDeEscritura(int permisos, bool flagUser, bool flagGroup){
     char otros = stringpermisos[2];
 
     //Retornamos los permisos comparando cada uno de los caracteres de UGO
-    if((propietario == '2' || propietario == '3' || propietario == '6' || propietario == '7') && flagUser)
+    if((propietario == '2' || propietario == '3' || propietario == '6' || propietario || '7') && flagUser)
         return true;
     else if((grupo == '2' || grupo == '3' || grupo == '6' || grupo == '7') && flagGroup)
         return true;
@@ -3886,6 +3934,79 @@ int crearCarpeta(string path, bool p){
 
     return retorno;
 }
+
+////////////////////////////////////////////////////////////////////////////////MANEJO DE REPORTES ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+void REPORTES(string valName,string valPath,string valID,string valRuta){
+    //Recibo el ID en minusculas
+    cout<<"nombre reporte:"<<valName<<endl;
+    cout<<"carpeta destino reporte:"<<valName<<endl;
+    cout<<"id disco reporte:"<<valName<<endl;
+    cout<<"ruta reporte file/ls:"<<valName<<endl;
+    string idtmp;
+    bool flag = false;
+    string ext = getExtension(valPath);
+    for(int i=0;i < arreglonodos.size();i++){
+        string vd="vd";
+        string letra="";
+        letra = arreglonodos[i].letra;
+        string numero = to_string(arreglonodos[i].numero);
+        idtmp = vd+letra+numero;
+        if(idtmp==valID){
+            flag=true; 
+            string directorio = getDirectorio(valPath);
+            string comando = "sudo mkdir -p \'"+directorio+"\'";
+            system(comando.c_str());
+            string comando2 = "sudo chmod -R 777 \'"+directorio+"\'";
+            system(comando2.c_str());
+            if(valName == "MBR")
+                cout<<"GRAFICARE MBR :D"<<endl;
+            else if(valName == "DISK")
+                cout<<"Graficare disco :D"<<endl;
+            else if(valName == "INODE"){
+                cout<<"Graficare inode :D"<<endl;
+            }else if(valName == "JORUNALING"){
+                cout<<"Graficare Journaling :D"<<endl;
+            }else if(valName == "BLOCK"){
+                cout<<"Graficare block :D"<<endl;
+            }else if(valName == "BM_INODE"){
+                cout<<"Graficare bm_inode :D"<<endl;
+            }else if(valName == "BM_BLOCH"){
+                cout<<"Graficare bm_block :D"<<endl;
+            }else if(valName == "TREE"){
+                cout<<"Graficare tree :D"<<endl;
+            }else if(valName == "SB"){
+                cout<<"Graficare sb :D"<<endl;
+            }else if(valName == "FILE"){
+                cout<<"Graficare file :D"<<endl;
+            }else if(valName == "LS"){
+                cout<<"Graficare ls :D"<<endl;
+            }      
+        }
+    }if(!flag){
+        cout<<"\033[91m Error: No se encontro la partición montada con ese id!!!\n Las particiones montadas son: \033[0m"<<endl;
+    }        
+}
+
+
+
+
+string getExtension(string direccion){
+    string aux = direccion;
+    string delimiter = ".";
+    size_t pos = 0;
+    while((pos = aux.find(delimiter))!=string::npos){
+        aux.erase(0,pos+delimiter.length());
+    }
+    return aux;
+}
+
 
 
 /*

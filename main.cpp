@@ -90,6 +90,9 @@ void REPORTES(string ,string ,string ,string );
 string ObtenerExt(string );
 void GraficarINODE(string ,string ,string,string );
 void generarDotINODE(string , string , string ,int ,int ,int );
+
+void GraficarJOURNALING(string ,string ,string ,string );
+void generarDotJOURNALING(string ,string , string ,int );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -3940,13 +3943,6 @@ int crearCarpeta(string path, bool p){
 }
 
 ////////////////////////////////////////////////////////////////////////////////MANEJO DE REPORTES ///////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
 void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorParticionMontada,string ruta){
     //Recibo el ID en minusculas
     cout<<"nombre reporte:"<<NombreReporte<<endl;
@@ -3975,8 +3971,8 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
                 GraficarDISCO(arreglonodos[i].path,DestinoReporte,extension);
             else if(NombreReporte == "INODE"){
                  GraficarINODE(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name);
-            }else if(NombreReporte == "JORUNALING"){
-                cout<<"Graficare Journaling :D"<<endl;
+            }else if(NombreReporte == "JOURNALING"){
+                GraficarJOURNALING(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name);
             }else if(NombreReporte == "BLOCK"){
                 cout<<"Graficare block :D"<<endl;
             }else if(NombreReporte == "BM_INODE"){
@@ -4257,7 +4253,9 @@ void GraficarDISCO(string PathDisk,string PathDestino, string extension ){
         cout << "\033[91m Error: No se encontro el disco deseado para hacer el reporte\033[0m" << endl;
 }
 }
-
+/*
+Metodo que recorre el disco para extaer los datos de los super bloques
+*/
 void GraficarINODE(string PathDisk,string PathDestino,string extension,string nombre){
     /*
     Buscamos el indice donde se encuentran las primarias o extendidas.
@@ -4295,6 +4293,9 @@ void GraficarINODE(string PathDisk,string PathDestino,string extension,string no
         }
     }
 }
+/*
+Método que recibe datos de superbloque de las particiones para extraer los datos de los inodos almacenados.
+*/
 void generarDotINODE(string PathDisk, string PathDestino, string extension,int bm_inode_start,int inode_start,int bm_block_start){
     FILE *FileDisk = fopen(PathDisk.c_str(), "r");
 
@@ -4363,6 +4364,84 @@ void generarDotINODE(string PathDisk, string PathDestino, string extension,int b
     cout << "\033[96m Reporte Inodos generado con éxito :D \033[0m   " << endl;
 }
 
+/*
+Metodos que se utilizan para la creacion de un reporte para el jorunaling.
+*/
+
+void GraficarJOURNALING(string PathDisk,string PathDestino,string extension,string nombre){
+    //Buscamos la posicion de la particion
+    int Cont = FindPrimariaYExtendida(PathDisk,nombre);
+    if(Cont != -1){//Primaria|Extendida
+        MBR mbr;
+        SuperBloque SB;
+        /*
+        Abrimos el disco para obtener el super bloque y de ahi obtener la posicion donde empieza   y la enviamos para el otro metodo
+        */
+        FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        fseek(FileDisk,mbr.mbr_partition[Cont].part_start,SEEK_SET);
+        fread(&SB,sizeof(SuperBloque),1,FileDisk);
+        fclose(FileDisk);
+        generarDotJOURNALING(PathDisk,PathDestino,extension,mbr.mbr_partition[Cont].part_start);
+    }
+}
+
+void generarDotJOURNALING(string direccion,string destino, string extension,int BitSBInicio){
+   
+   /*
+   Abrimos el disco y creamos un objeto de tipo superbloque y de tipo Journaling
+   */
+    FILE *FileDisk = fopen(direccion.c_str(),"r");
+
+    SuperBloque SB;
+    Journaling Journal;
+
+    /*
+    Como del metodo anterior ya obtuvimos el bit de inicio del sb colocamos la lectura en ese bit y leemos el superbloque entero
+    */
+    fseek(FileDisk,BitSBInicio,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    /*
+    Creamos el archivo que almacenara el dot y tambien lo ejecutara para exportarlo en imagen
+    */
+    FILE *GraphDot = fopen("Journaling.dot","w");
+    /*
+    Creamos el inicio del archivo y empezamos a hacer la tabla 
+    */
+    fprintf(GraphDot,"digraph G{\n");
+    fprintf(GraphDot, "    nodo [shape=note, label=<\n");
+    fprintf(GraphDot, "   <table border=\'10\' cellborder='1\' cellspacing=\'5\'>\n");
+    fprintf(GraphDot, "    <tr> <td COLSPAN=\'7\' bgcolor=\"gray\"> <b>REPORTE JOURNALING</b> </td></tr>\n");
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"><b>Operacion</b></td> <td bgcolor=\"gray\"><b>Tipo</b></td><td bgcolor=\"gray\"><b>Nombre</b></td><td bgcolor=\"gray\"><b>Contenido</b></td>\n");
+    fprintf(GraphDot, "    <td bgcolor=\"gray\"><b>Propietario</b></td><td bgcolor=\"gray\"><b>Permisos</b></td><td bgcolor=\"gray\"><b>Fecha</b></td></tr>\n");
+    
+    /*
+    posicionamos en el bit del inicio
+    */
+    fseek(FileDisk,BitSBInicio + static_cast<int>(sizeof(SuperBloque)),SEEK_SET);
+    while(ftell(FileDisk) < SB.s_bm_inode_start){
+        /*
+        recorremos para ir leyendo y sustituyendo datos
+        */
+        fread(&Journal,sizeof(Journaling),1,FileDisk);
+        if(Journal.Journal_tipo == 0 || Journal.Journal_tipo == 1){
+            struct tm *tm;
+            char Date[100];
+            tm = localtime(&Journal.Journal_fecha);
+            strftime(Date,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot,"<tr><td>%s</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>\n",Journal.Journal_tipo_operacion,Journal.Journal_tipo,Journal.Journal_nombre,Journal.Journal_contenido,Journal.Journal_propietario,Journal.Journal_permisos,Date);
+        }
+    }
+    fprintf(GraphDot, " </table>>]\n");
+    fprintf(GraphDot,"}");
+    fclose(GraphDot);
+
+    fclose(FileDisk);
+
+    string comando = "dot -T"+extension+" Journaling.dot -o "+destino;
+    system(comando.c_str());
+    cout << "\033[96m Reporte Journal generado con éxito :D \033[0m " << endl;
+}
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 
 */

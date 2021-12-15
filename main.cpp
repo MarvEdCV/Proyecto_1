@@ -94,6 +94,7 @@ void generarDotINODE(string , string , string ,int ,int ,int );
 void GraficarJOURNALING(string ,string ,string ,string );
 void generarDotJOURNALING(string ,string , string ,int );
 void generarDotBLOCK(string , string , string , int , int , int );
+void generarDotSB(string , string , string , int );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -3983,7 +3984,7 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             }else if(NombreReporte == "TREE"){
                 cout<<"Graficare tree :D"<<endl;
             }else if(NombreReporte == "SB"){
-                cout<<"Graficare sb :D"<<endl;
+                GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "FILE"){
                 cout<<"Graficare file :D"<<endl;
             }else if(NombreReporte == "LS"){
@@ -4274,6 +4275,9 @@ void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,str
         Apuntamos el archivo en la posicion de la particion primaria  o logica encontrada y leemos el superbloque.
         */
         fseek(FileDisk,mbr.mbr_partition[Numero].part_start,SEEK_SET);
+        if(operacion == "SB"){
+            generarDotSB(PathDisk,PathDestino,extension,mbr.mbr_partition[Numero].part_start);
+        }
         fread(&SB,sizeof(SuperBloque),1,FileDisk);//Leemos el SB bloque para mandar sus atributos al metodo que genera el dot
         fclose(FileDisk);//Cerramos el archivo del disco
         if(operacion=="INODE"){
@@ -4292,8 +4296,13 @@ void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,str
             FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
             fseek(FileDisk,Numero,SEEK_SET);
             fread(&ebr,sizeof(EBR),1,FileDisk);
+            if(operacion=="SB"){
+                int inicio = static_cast<int>(ftell(FileDisk));
+                generarDotSB(PathDisk,PathDestino,extension,inicio);
+            }
             fread(&SB,sizeof(SuperBloque),1,FileDisk);
             fclose(FileDisk);
+
            if(operacion=="INODE"){
             generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el SB bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
         }else if(operacion=="BLOCK"){
@@ -4472,8 +4481,8 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
     /*
     Abrimos el archivo donde crearemos el dot 
     */
-    FILE *graph = fopen("Block.dot","w");
-    fprintf(graph,"digraph G{\n\n");
+    FILE *GraphDot = fopen("Block.dot","w");
+    fprintf(GraphDot,"digraph G{\n\n");
     /*
     Se repetira mientras el inicio del bitmap sea menor al bit inicial del inodo
     */
@@ -4494,42 +4503,42 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
             /*
             empezamos a escribir en el dot ya que podemos obtener los datos necesarios.
             */
-            fprintf(graph, "    nodo_%d [ shape=tab,  label=< \n",i);
-            fprintf(graph, "   <table border=\'0\' cellborder='1' cellspacing='0' bgcolor=\"gray\">");
-            fprintf(graph, "    <tr> <td colspan=\'2\'> <b>Rep Bloque Carpetas_ %d</b> </td></tr>\n",i);
-            fprintf(graph, "    <tr> <td bgcolor=\"#708090\"> b_name </td> <td bgcolor=\"#708090\"> b_inode </td></tr>\n");
+            fprintf(GraphDot, "    nodo_%d [ shape=tab,  label=< \n",i);
+            fprintf(GraphDot, "   <table border=\'0\' cellborder='1' cellspacing='0' bgcolor=\"gray\">");
+            fprintf(GraphDot, "    <tr> <td colspan=\'2\'> <b>Rep Bloque Carpetas_ %d</b> </td></tr>\n",i);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"#708090\"> b_name </td> <td bgcolor=\"#708090\"> b_inode </td></tr>\n");
             
             for(int j = 0;j < 4;j++)
-                fprintf(graph, "    <tr> <td bgcolor=\"#FFF5EE\"> %s </td> <td bgcolor=\"#FFF5EE\"> %d </td></tr>\n",carpeta.b_content[j].b_name,carpeta.b_content[j].b_inodo);
-            fprintf(graph, "   </table>>]\n\n");
+                fprintf(GraphDot, "    <tr> <td bgcolor=\"#FFF5EE\"> %s </td> <td bgcolor=\"#FFF5EE\"> %d </td></tr>\n",carpeta.b_content[j].b_name,carpeta.b_content[j].b_inodo);
+            fprintf(GraphDot, "   </table>>]\n\n");
             /*
             En el caso de ue el buffer sea 2 o 3 siguen la misma logica ue cuando es tipo bloque carpeta!!
             */
         }else if(buffer == '2'){//mientras sea de tipo bloque archivo
             fseek(FileDisk,block_start + static_cast<int>(sizeof(Bloque_Archivos))*i,SEEK_SET);
             fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
-            fprintf(graph, "    nodo_%d [ shape=tab, label=< \n",i);
-            fprintf(graph, "   <table border=\'0\' cellborder='1' cellspacing='0' bgcolor=\"#8B0000\">");
-            fprintf(graph, "    <tr> <td colspan=\'2\'> <b>Bloque Archivo %d </b></td></tr>\n",i);
-            fprintf(graph, "    <tr> <td colspan=\'2\' bgcolor=\"#FFF5EE\"> %s </td></tr>\n",archivo.b_content);
-            fprintf(graph, "   </table>>]\n\n");
+            fprintf(GraphDot, "    nodo_%d [ shape=tab, label=< \n",i);
+            fprintf(GraphDot, "   <table border=\'0\' cellborder='1' cellspacing='0' bgcolor=\"#8B0000\">");
+            fprintf(GraphDot, "    <tr> <td colspan=\'2\'> <b>Bloque Archivo %d </b></td></tr>\n",i);
+            fprintf(GraphDot, "    <tr> <td colspan=\'2\' bgcolor=\"#FFF5EE\"> %s </td></tr>\n",archivo.b_content);
+            fprintf(GraphDot, "   </table>>]\n\n");
         }else if(buffer == '3'){//Mientras sea de tipo apuntadores 
             fseek(FileDisk,block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*i,SEEK_SET);
             fread(&Puntero,sizeof(BloqueDeApuntadores),1,FileDisk);
             fseek(FileDisk,block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*i,SEEK_SET);
             fread(&Puntero,sizeof(BloqueDeApuntadores),1,FileDisk);
-            fprintf(graph, "    bloque_%d [shape=plaintext  label=< \n",i);
-            fprintf(graph, "   <table border=\'0\' bgcolor=\"#FF0000\">\n");
-            fprintf(graph, "    <tr> <td> <b>Bloque de punteros %d</b></td></tr>\n",i);
+            fprintf(GraphDot, "    bloque_%d [shape=plaintext  label=< \n",i);
+            fprintf(GraphDot, "   <table border=\'0\' bgcolor=\"#FF0000\">\n");
+            fprintf(GraphDot, "    <tr> <td> <b>Bloque de punteros %d</b></td></tr>\n",i);
             for(int j = 0; j < 16; j++)
-                fprintf(graph, "    <tr> <td bgcolor=\"#FFF5EE\">%d</td> </tr>\n",Puntero.b_pointers[j]);
-            fprintf(graph, "   </table>>]\n\n");
+                fprintf(GraphDot, "    <tr> <td bgcolor=\"#FFF5EE\">%d</td> </tr>\n",Puntero.b_pointers[j]);
+            fprintf(GraphDot, "   </table>>]\n\n");
         }
         i++;//contador de indexacion
     }
 
-    fprintf(graph,"\n}");
-    fclose(graph);
+    fprintf(GraphDot,"\n}");
+    fclose(GraphDot);
 
     fclose(FileDisk);
 
@@ -4538,6 +4547,64 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
     cout << "\033[96m Reporte Block generado con éxito :D \033[0m " << endl;
 }
 
+
+
+void generarDotSB(string direccion, string destino, string extension, int start_super){
+    /*
+    Abrimos el disco y creamos un super bloque
+    */
+    FILE* FileDisk = fopen(direccion.c_str(),"r");
+
+    SuperBloque SB;
+    /*
+    Establecemos el puntero en el inicio del superbloque y leemos el superbloque completo
+    */
+    fseek(FileDisk,start_super,SEEK_SET);
+    fread(&SB,sizeof (SB),1,FileDisk);
+
+    /*
+    Creamos el archivo que almacenara eldot que generara el reporte ya que ya tenemos acceso para leer los datos...
+    */
+    FILE *GraphDot = fopen("SuperBloque.dot","w");
+    fprintf(GraphDot,"digraph G{\n");
+    fprintf(GraphDot, "    nodo [shape=box3d, label=<");
+    fprintf(GraphDot, "   <table border=\'10\' cellborder='0\' cellspacing=\'2\' bgcolor=\"cornflowerblue\">");
+    fprintf(GraphDot, "    <tr> <td COLSPAN=\'2\'> <b>SUPERBLOQUE</b> </td></tr>\n");
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_inodes_count </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_inodes_count);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_blocks_count </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_blocks_count);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_free_block_count </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_free_blocks_count);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_free_inodes_count </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_free_inodes_count);
+    /*
+    Creamos una estructura de tipo time para poder indicar los parametros que son de tiempo
+    */
+    struct tm *tm;
+    char fecha[100];
+    tm=localtime(&SB.s_mtime);
+    strftime(fecha,100,"%d/%m/%y %H:%S",tm);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_mtime </td> <td bgcolor=\"#F0FFF0\"> %s </td></tr>\n",fecha);
+    tm=localtime(&SB.s_umtime);
+    strftime(fecha,100,"%d/%m/%y %H:%S",tm);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_umtime </td> <td bgcolor=\"#F0FFF0\"> %s </td> </tr>\n",fecha);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_mnt_count </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_mnt_count);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_magic </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_magic);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_inode_size </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_inode_size);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_block_size </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_block_size);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_first_ino </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_first_ino);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_first_blo </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_first_blo);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_bm_inode_start </td> <td bgcolor=\"#F0FFF0\"> %d </td></tr>\n",SB.s_bm_inode_start);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_bm_block_start </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_bm_block_start);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_inode_start </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_inode_start);
+    fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> s_block_start </td> <td bgcolor=\"#F0FFF0\"> %d </td> </tr>\n",SB.s_block_start);
+    fprintf(GraphDot, "   </table>>]\n");
+    fprintf(GraphDot,"\n}");
+    fclose(GraphDot);
+
+    fclose(FileDisk);
+
+    string comando = "dot -T"+extension+" SuperBloque.dot -o "+destino;
+    system(comando.c_str());
+    cout << "\033[96m Reporte SuperBloque generado con éxito :D \033[0m " << endl;
+}
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 
 */

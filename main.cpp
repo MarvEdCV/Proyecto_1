@@ -53,6 +53,7 @@ void login(string,string,string);
 void logout();
 void DesmontarParticionSinMensaje(string,int);
 
+void GraficarMBR(string , string , string );
 //mmadf
 void MKGRP(string);
 int ObtenerIDG();
@@ -85,7 +86,7 @@ int crearCarpeta(string , bool p);
 
 void GraficarMBR(string , string , string );
 void REPORTES(string ,string ,string ,string );
-string getExtension(string );
+string ObtenerExt(string );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -771,14 +772,14 @@ void EjecutarComando(char comando[200]){
                         name = namepath[namepath.size()-1];*/
                         name = auxiliar[1];
 
-                    }else if(auxiliar[1] == "-PATH"){
+                    }else if(auxiliar[0] == "-PATH"){
                         string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                         path = pathx;
-                    }else if(auxiliar[1] == "-ID"){
+                    }else if(auxiliar[0] == "-ID"){
                         id = EliminarComillasYreemplazarEspacios(auxiliarSinCastear[1]);                       
-                    }else if(auxiliar[1] == "-RUTA"){
+                    }else if(auxiliar[0] == "-RUTA"){
                        string auxiliare = auxiliarSinCastear[1];
                         string pathx;
                         pathx = EliminarComillasYreemplazarEspacios(auxiliare);
@@ -3943,49 +3944,49 @@ int crearCarpeta(string path, bool p){
 
 
 
-void REPORTES(string valName,string valPath,string valID,string valRuta){
+void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorParticionMontada,string ruta){
     //Recibo el ID en minusculas
-    cout<<"nombre reporte:"<<valName<<endl;
-    cout<<"carpeta destino reporte:"<<valName<<endl;
-    cout<<"id disco reporte:"<<valName<<endl;
-    cout<<"ruta reporte file/ls:"<<valName<<endl;
+    cout<<"nombre reporte:"<<NombreReporte<<endl;
+    cout<<"carpeta destino reporte:"<<DestinoReporte<<endl;
+    cout<<"id disco reporte:"<<IdentificadorParticionMontada<<endl;
+    cout<<"ruta reporte file/ls:"<<ruta<<endl;
     string idtmp;
     bool flag = false;
-    string ext = getExtension(valPath);
+    string extension = ObtenerExt(DestinoReporte);
     for(int i=0;i < arreglonodos.size();i++){
         string vd="vd";
         string letra="";
         letra = arreglonodos[i].letra;
         string numero = to_string(arreglonodos[i].numero);
         idtmp = vd+letra+numero;
-        if(idtmp==valID){
+        if(idtmp==IdentificadorParticionMontada){
             flag=true; 
-            string directorio = getDirectorio(valPath);
+            string directorio = getDirectorio(DestinoReporte);
             string comando = "sudo mkdir -p \'"+directorio+"\'";
             system(comando.c_str());
             string comando2 = "sudo chmod -R 777 \'"+directorio+"\'";
             system(comando2.c_str());
-            if(valName == "MBR")
-                cout<<"GRAFICARE MBR :D"<<endl;
-            else if(valName == "DISK")
+            if(NombreReporte == "MBR")
+                GraficarMBR(arreglonodos[i].path,DestinoReporte,extension);
+            else if(NombreReporte == "DISK")
                 cout<<"Graficare disco :D"<<endl;
-            else if(valName == "INODE"){
+            else if(NombreReporte == "INODE"){
                 cout<<"Graficare inode :D"<<endl;
-            }else if(valName == "JORUNALING"){
+            }else if(NombreReporte == "JORUNALING"){
                 cout<<"Graficare Journaling :D"<<endl;
-            }else if(valName == "BLOCK"){
+            }else if(NombreReporte == "BLOCK"){
                 cout<<"Graficare block :D"<<endl;
-            }else if(valName == "BM_INODE"){
+            }else if(NombreReporte == "BM_INODE"){
                 cout<<"Graficare bm_inode :D"<<endl;
-            }else if(valName == "BM_BLOCH"){
+            }else if(NombreReporte == "BM_BLOCH"){
                 cout<<"Graficare bm_block :D"<<endl;
-            }else if(valName == "TREE"){
+            }else if(NombreReporte == "TREE"){
                 cout<<"Graficare tree :D"<<endl;
-            }else if(valName == "SB"){
+            }else if(NombreReporte == "SB"){
                 cout<<"Graficare sb :D"<<endl;
-            }else if(valName == "FILE"){
+            }else if(NombreReporte == "FILE"){
                 cout<<"Graficare file :D"<<endl;
-            }else if(valName == "LS"){
+            }else if(NombreReporte == "LS"){
                 cout<<"Graficare ls :D"<<endl;
             }      
         }
@@ -3997,7 +3998,7 @@ void REPORTES(string valName,string valPath,string valID,string valRuta){
 
 
 
-string getExtension(string direccion){
+string ObtenerExt(string direccion){
     string aux = direccion;
     string delimiter = ".";
     size_t pos = 0;
@@ -4007,7 +4008,113 @@ string getExtension(string direccion){
     return aux;
 }
 
+void GraficarMBR(string direccion, string destino, string extension){
+    string auxDir = direccion;
+    FILE *FileDis;
+    FILE *FileGraphDot;
+    //Empezamos a llenar el archivo para la grafica del mbr
+    if((FileDis = fopen(auxDir.c_str(),"r"))){
+        FileGraphDot = fopen("grafica.dot", "w");
+        fprintf(FileGraphDot,"digraph G{ \n");
+        fprintf(FileGraphDot,"subgraph cluster_0{\n label=\"REPORTE MBR\"");
+        fprintf(FileGraphDot,"\ntbl[shape=box3d,label=<\n");
+        fprintf(FileGraphDot,"<table border=\'0\' cellborder=\'1\' cellspacing=\'0\' width=\'300\'  height=\'200\' >\n");//Establecemos con html el borde 
+        fprintf(FileGraphDot, "<tr>  <td width=\'150\'> <b>Atributo MBR</b> </td> <td width=\'150\'> <b>Valor</b> </td>  </tr>\n");
+        MBR masterBoot;
+        fseek(FileDis,0,SEEK_SET);
+        fread(&masterBoot,sizeof(MBR),1,FileDis);
+        int tamano = masterBoot.mbr_tamano;
+        fprintf(FileGraphDot,"<tr>  <td><b>mbr_tamaño</b></td><td>%d</td>  </tr>\n",tamano);
+        struct tm *tm;
+        char fecha[100];
+        tm = localtime(&masterBoot.mbr_fecha_creacion);
+        /*
+        Establecemos los subtitulos de los diferentes atributos para llenar
+        */
+        strftime(fecha,100,"%d/%m/%y %H:%S",tm);//Hora de generacion de mbr
+        fprintf(FileGraphDot,"<tr>  <td><b>mbr_fecha_creacion</b></td> <td>%s</td>  </tr>\n",fecha);
+        fprintf(FileGraphDot,"<tr>  <td><b>mbr_disk_signature</b></td> <td>%d</td>  </tr>\n",masterBoot.mbr_disk_signature);
+        fprintf(FileGraphDot,"<tr>  <td><b>disk_fit</b></td> <td>%c</td>  </tr>\n",masterBoot.disk_fit);
 
+        /*
+        
+        */
+        int index_Extendida = -1;
+        for (int i = 0; i < 4; i++){
+            if(masterBoot.mbr_partition[i].part_start!=-1 && masterBoot.mbr_partition[i].part_status!='1'){
+                if(masterBoot.mbr_partition[i].part_type == 'E'){
+                    index_Extendida = i;//Por si es extendida.
+                }
+                /*
+                Si no ex extendida creamos las filas llenando los datos con las partes de la primaria
+                */
+                char status[3];
+                if(masterBoot.mbr_partition[i].part_status == '0')// copiamos el status de la particion
+                    strcpy(status,"0");
+                else if(masterBoot.mbr_partition[i].part_status == '2')// copiamos el status de la particion
+                    strcpy(status,"2");
+                fprintf(FileGraphDot,"<tr>  <td><b>part_status_%d</b></td> <td>%s</td>  </tr>\n",(i+1),status);
+                fprintf(FileGraphDot,"<tr>  <td><b>part_type_%d</b></td> <td>%c</td>  </tr>\n",(i+1),masterBoot.mbr_partition[i].part_type);
+                fprintf(FileGraphDot,"<tr>  <td><b>part_fit_%d</b></td> <td>%c</td>  </tr>\n",(i+1),masterBoot.mbr_partition[i].part_fit);
+                fprintf(FileGraphDot,"<tr>  <td><b>part_start_%d</b></td> <td>%d</td>  </tr>\n",(i+1),masterBoot.mbr_partition[i].part_start);
+                fprintf(FileGraphDot,"<tr>  <td><b>part_size_%d</b></td> <td>%d</td>  </tr>\n",(i+1),masterBoot.mbr_partition[i].part_size);
+                fprintf(FileGraphDot,"<tr>  <td><b>part_name_%d</b></td> <td>%s</td>  </tr>\n",(i+1),masterBoot.mbr_partition[i].part_name);
+            }
+        }
+
+        fprintf(FileGraphDot,"</table>\n");//Cerramos la tabla html
+        fprintf(FileGraphDot, ">];\n}\n");//finalizamos el dot.
+
+        /*
+        Si la extendida existe osea es diferente de -1
+        */
+        if(index_Extendida != -1){
+            int index_ebr = 1;
+            EBR extendedBoot;
+            //posicionamos el arhivo donde inicia el mbr
+            fseek(FileDis,masterBoot.mbr_partition[index_Extendida].part_start,SEEK_SET);
+            /*
+            Repetimos el ciclo hasta que se acaben las EBR activas
+            */
+            while(fread(&extendedBoot,sizeof(EBR),1,FileDis)!=0 && (ftell(FileDis) < masterBoot.mbr_partition[index_Extendida].part_start + masterBoot.mbr_partition[index_Extendida].part_size)) {
+                if(extendedBoot.part_status != '1'){
+                    /*
+                    Si el estado del EBR es diferene de -1 repetimos 
+                    */
+                    fprintf(FileGraphDot,"subgraph cluster_%d{\n label=\"EBR_Numero_%d\"\n",index_ebr,index_ebr);
+                    fprintf(FileGraphDot,"\ntbl_%d[shape=box3d,label=<\n ",index_ebr);//agregamos el numero del ebr a cada nodo
+                    fprintf(FileGraphDot, "<table border=\'0\' cellborder=\'1\' cellspacing=\'0\'  width=\'300\' height=\'160\' >\n ");
+                    fprintf(FileGraphDot, "<tr>  <td width=\'150\'><b>Atributo EBR</b></td> <td width=\'150\'><b>Valor</b></td>  </tr>\n");
+                    char status[3];
+                    if(extendedBoot.part_status == '0')//copiamos estado
+                        strcpy(status,"0");
+                    else if(extendedBoot.part_status == '2')//copiamos estado
+                        strcpy(status,"2");
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_status_1</b></td> <td>%s</td>  </tr>\n",status);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_fit_1</b></td> <td>%c</td>  </tr>\n",extendedBoot.part_fit);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_start_1</b></td> <td>%d</td>  </tr>\n",extendedBoot.part_start);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_size_1</b></td> <td>%d</td>  </tr>\n",extendedBoot.part_size);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_next_1</b></td> <td>%d</td>  </tr>\n",extendedBoot.part_next);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_name_1</b></td> <td>%s</td>  </tr>\n",extendedBoot.part_name);
+                    fprintf(FileGraphDot, "</table>\n");
+                    fprintf(FileGraphDot, ">];\n}\n");
+                    index_ebr++;//Sumamos para pasar al siguiente ebr
+                }
+
+                if(extendedBoot.part_next == -1)//paramos en dado caso la logica este en estado -1
+                    break;
+                else
+                    fseek(FileDis,extendedBoot.part_next,SEEK_SET);//Posicionamos el puntero del ardchivo al siguiente
+            }
+        }
+        fprintf(FileGraphDot,"}\n");//cerramos el dot
+        fclose(FileGraphDot);//cerramos el file del dot
+        fclose(FileDis);//cerramos archivo del disco
+        string comando = "dot -T"+extension+" grafica.dot -o "+destino;
+        system(comando.c_str());//ejecutamos el comando para crear el dot y ejecutarlo 
+        cout << "\033[96m Reporte MBR generado con éxito :D \033[0m " << endl;
+    }
+}
 
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 

@@ -96,6 +96,11 @@ void generarDotJOURNALING(string ,string , string ,int );
 void generarDotBLOCK(string , string , string , int , int , int );
 void generarDotSB(string , string , string , int );
 void generarDotTree(string , string , string , int );
+void GraficarFILE(string ,string ,string ,string,string );
+void GraficarLS(string ,string ,string ,string ,string);
+void generarDotFile(string , string , string , string ,int ,int );
+
+
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -147,6 +152,15 @@ struct DiscoD{
     char fit='F';//Primer ajuste como default.
 }
 Disk1;
+struct Usuario{
+    int id_usr;
+    int id_grp;
+    char username[12];
+    char password[12];
+    char group[12];
+};
+Usuario getUsuario(string ,int , int );
+void generarDotLs(string , string , string , int , int , Usuario , string );
 struct nodoParticionMontada {
     string path;
     string name;
@@ -260,7 +274,7 @@ cout<<"\033[92m************************CREANDO DISCO*************************\03
 }
 //FUNCIONES Y METODOS A UTILIZAR 
 Tabla_Inodos crearInodo(int ,char ,int );
-Bloque_Carpetas crearBloqueCarpeta();
+Bloque_Carpetas crearBloque_Carpetas();
 int buscarContentLibre(FILE* ,int ,Tabla_Inodos &,Bloque_Carpetas &, BloqueDeApuntadores &,int &,int &,int &);
 ActiveSession SesionActual;
 vector<nodoParticionMontada> arreglonodos;
@@ -2462,6 +2476,67 @@ bool buscarUsuario(string name){
 
     return false;
 }
+Usuario getUsuario(string direccion,int inicioSuper, int usuario){
+    FILE *FileDisk = fopen(direccion.c_str(),"rb+");
+
+    char cadena[400] = "\0";
+    SuperBloque SB;
+    Tabla_Inodos inodo;
+    Usuario response;
+
+    fseek(FileDisk,inicioSuper,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    //Nos posicionamos en el inodo del archivo users.txt
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos)), SEEK_SET);
+    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    for(int i = 0; i < 15; i++){
+        if(inodo.i_block[i] != -1){
+            Bloque_Archivos archivo;
+            fseek(FileDisk,SB.s_block_start,SEEK_SET);
+            for(int j = 0; j <= inodo.i_block[i]; j++){
+                fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            }
+            strcat(cadena,archivo.b_content);
+        }
+    }
+
+    fclose(FileDisk);
+
+    char *end_str;
+    char *token = strtok_r(cadena,"\n",&end_str);
+    while(token != nullptr){
+        char id[2];
+        char tipo[2];
+        char user[12];
+        char grupo[12];
+        char *end_token;
+        char *token2 = strtok_r(token,",",&end_token);
+        strcpy(id,token2);
+        if(strcmp(id,"0") != 0){//Verificar que no sea un U/G eliminado
+            token2 = strtok_r(nullptr,",",&end_token);
+            strcpy(tipo,token2);
+            if(strcmp(tipo,"U") == 0){
+                token2 = strtok_r(nullptr,",",&end_token);
+                strcpy(grupo,token2);
+                token2 = strtok_r(nullptr,",",&end_token);
+                strcpy(user,token2);
+                int idAux = atoi(id);
+                if(idAux == usuario){
+                    response.id_usr = atoi(id);
+                    response.id_grp = FindGrupo(grupo);
+                    strcpy(response.username,user);
+                    strcpy(response.group,grupo);
+                    return response;
+                }
+
+            }
+        }
+        token = strtok_r(nullptr,"\n",&end_str);
+    }
+    return response;
+}
+
 int getID_usr(){
     FILE *FileDisk = fopen(SesionActual.direccion.c_str(),"rb+");
 
@@ -2817,7 +2892,7 @@ int crearArchivo(string path, bool p, int size, string cont){
     return retorno;
 }
 
-int nuevoArchivo(FILE *stream, char fit, bool P, char *path, int size, string contenido, int index,char *auxPath){
+int nuevoArchivo(FILE *stream, char fit, bool P, char *path, int size, string contenido, int NumInodo,char *auxPath){
     SuperBloque SB;
     Tabla_Inodos inodo,inodoNuevo;
     Bloque_Carpetas carpeta, carpetaNueva;
@@ -2836,7 +2911,7 @@ int nuevoArchivo(FILE *stream, char fit, bool P, char *path, int size, string co
     strcpy(Pathtmp,path);
     char *token = strtok(path,"/");
     int cont = 0;
-    int numInodo = index;
+    int numInodo = NumInodo;
     int finalSize = size;
 
     while(token != nullptr){
@@ -3318,14 +3393,14 @@ int nuevoArchivo(FILE *stream, char fit, bool P, char *path, int size, string co
         int existe = buscarCarpetaArchivo(stream,directorio);
         if(existe == -1){
             if(P){
-                int index = 0;
+                int Contador = 0;
                 string tmp = "";
                 //Crear posibles carpetas inexistentes
                 for (int i = 0; i < cont; i++) {
                     if(i == cont -1){
                         char dir[100] = "/";
                         strcat(dir,nombreCarpeta);
-                        return nuevoArchivo(stream,fit,false,dir,size,contenido,index,auxPath);
+                        return nuevoArchivo(stream,fit,false,dir,size,contenido,Contador,auxPath);
                     }else{
                         tmp += "/"+lista.at(i);
                         char dir[500];
@@ -3334,11 +3409,11 @@ int nuevoArchivo(FILE *stream, char fit, bool P, char *path, int size, string co
                         strcpy(auxDir,tmp.c_str());
                         int carpeta = buscarCarpetaArchivo(stream,dir);
                         if(carpeta == -1){
-                            nuevaCarpeta(stream,fit,false,auxDir,index);
+                            nuevaCarpeta(stream,fit,false,auxDir,Contador);
                             strcpy(auxDir,tmp.c_str());
-                            index = buscarCarpetaArchivo(stream,auxDir);
+                            Contador = buscarCarpetaArchivo(stream,auxDir);
                         }else
-                            index = carpeta;
+                            Contador = carpeta;
                     }
                 }
             }else
@@ -3548,7 +3623,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                     /*
                     Creamos el nuevo bloque paara la carpeta! 
                     */
-                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva = crearBloque_Carpetas();
                     carpetaNueva.b_content[0].b_inodo = bitInodo;
                     carpetaNueva.b_content[1].b_inodo = numInodo;
                     strcpy(carpetaNueva.b_content[0].b_name,".");
@@ -3600,7 +3675,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                     fseek(stream,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*bitInodo,SEEK_SET);
                     fwrite(&inodoNuevo,sizeof(Tabla_Inodos),1,stream);
                     //Creamos el nuevo bloque carpeta
-                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva = crearBloque_Carpetas();
                     carpetaNueva.b_content[0].b_inodo = bitInodo;
                     carpetaNueva.b_content[1].b_inodo = numInodo;
                     strcpy(carpetaNueva.b_content[0].b_name,".");
@@ -3673,21 +3748,21 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                     fseek(stream,SB.s_bm_block_start + bitBloque,SEEK_SET);
                     fwrite(&buffer3,sizeof(char),1,stream);
                     //Creamos el bloque de apuntadores como es simple solo se debe crear uno
-                    int bitBloqueCarpeta = FindBit(stream,'B',fit);//Carpeta
-                    apuntadores.b_pointers[0] = bitBloqueCarpeta;
+                    int bitBloque_Carpetas = FindBit(stream,'B',fit);//Carpeta
+                    apuntadores.b_pointers[0] = bitBloque_Carpetas;
                     for(int i = 1; i < 16; i++)
                         apuntadores.b_pointers[i] = -1;
                     fseek(stream,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*bitBloque,SEEK_SET);
                     fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
                     //Creamos la carpeta del apuntador
                     int bitInodo = FindBit(stream,'I',fit);
-                    carpetaAux = crearBloqueCarpeta();
+                    carpetaAux = crearBloque_Carpetas();
                     carpetaAux.b_content[0].b_inodo = bitInodo;
                     strcpy(carpetaAux.b_content[0].b_name,nombreCarpeta);
-                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloqueCarpeta,SEEK_SET);
+                    fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque_Carpetas,SEEK_SET);
                     fwrite(&carpetaAux,sizeof(Bloque_Carpetas),1,stream);
                     //Escribimos el bit del bloque carpeta en el bitmap
-                    fseek(stream,SB.s_bm_block_start + bitBloqueCarpeta,SEEK_SET);
+                    fseek(stream,SB.s_bm_block_start + bitBloque_Carpetas,SEEK_SET);
                     fwrite(&buffer,sizeof(char),1,stream);
                     //Creamos el nuevo inodo carpeta
                     inodoNuevo = crearInodo(0,'0',664);
@@ -3699,7 +3774,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                     fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
                     fwrite(&buffer,sizeof(char),1,stream);
                     //Creamos el nuevo bloque carpeta
-                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva = crearBloque_Carpetas();
                     carpetaNueva.b_content[0].b_inodo = bitInodo;
                     carpetaNueva.b_content[1].b_inodo = numInodo;
                     strcpy(carpetaNueva.b_content[0].b_name,".");
@@ -3728,7 +3803,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                 fwrite(&apuntadores,sizeof(BloqueDeApuntadores),1,stream);
                 //Creamos el bloque auxiliar
                 int bitInodo = FindBit(stream,'I',fit);
-                carpetaAux = crearBloqueCarpeta();
+                carpetaAux = crearBloque_Carpetas();
                 carpetaAux.b_content[0].b_inodo = bitInodo;
                 strcpy(carpetaAux.b_content[0].b_name,nombreCarpeta);
                 fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
@@ -3748,7 +3823,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                 fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
                 fwrite(&buffer,sizeof(char),1,stream);
                 //Creamos el nuevo bloque carpeta
-                carpetaNueva = crearBloqueCarpeta();
+                carpetaNueva = crearBloque_Carpetas();
                 carpetaNueva.b_content[0].b_inodo = bitInodo;
                 carpetaNueva.b_content[1].b_inodo = numInodo;
                 strcpy(carpetaNueva.b_content[0].b_name,".");
@@ -3782,7 +3857,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                     fwrite(&inodo,sizeof(Tabla_Inodos),1,stream);
                     //Bloque carpeta auxiliar
                     int bitInodo = FindBit(stream,'I',fit);
-                    carpetaAux = crearBloqueCarpeta();
+                    carpetaAux = crearBloque_Carpetas();
                     carpetaAux.b_content[0].b_inodo = bitInodo;
                     strcpy(carpetaAux.b_content[0].b_name,nombreCarpeta);
                     fseek(stream,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*bitBloque,SEEK_SET);
@@ -3800,7 +3875,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
                     fseek(stream,SB.s_bm_inode_start + bitInodo,SEEK_SET);
                     fwrite(&buffer,sizeof(char),1,stream);
                     //Creamos el nuevo bloque carpeta
-                    carpetaNueva = crearBloqueCarpeta();
+                    carpetaNueva = crearBloque_Carpetas();
                     carpetaNueva.b_content[0].b_inodo = bitInodo;
                     carpetaNueva.b_content[1].b_inodo = numInodo;
                     strcpy(carpetaNueva.b_content[0].b_name,".");
@@ -3862,7 +3937,7 @@ int nuevaCarpeta(FILE *stream, char fit, bool P, char *path, int index){
 /*
 Funcion que retorna una carpeta que se llena automaticamente con -1
 */
-Bloque_Carpetas crearBloqueCarpeta(){
+Bloque_Carpetas crearBloque_Carpetas(){
     Bloque_Carpetas carpeta;
 
     for(int i = 0; i < 4; i++){
@@ -3987,9 +4062,9 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             }else if(NombreReporte == "SB"){
                 GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "FILE"){
-                cout<<"Graficare file :D"<<endl;
+                GraficarFILE(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,ruta);
             }else if(NombreReporte == "LS"){
-                cout<<"Graficare ls :D"<<endl;
+                GraficarLS(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,ruta);
             }      
         }
     }if(!flag){
@@ -4554,7 +4629,6 @@ void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int 
 }
 
 
-
 void generarDotSB(string direccion, string destino, string extension, int start_super){
     /*
     Abrimos el disco y creamos un SB bloque
@@ -4638,7 +4712,7 @@ void generarDotTree(string direccion, string destino, string extension, int star
     fprintf(GraphDot, "    rankdir=\"LR\" \n");
 
     /*
-    Empezamos a recorrer el super bloque para crear los inodos
+    Empezamos a recorrer el SB bloque para crear los inodos
     */
     while(InicioSB < SB.s_bm_block_start){
         /*
@@ -4811,13 +4885,246 @@ void generarDotTree(string direccion, string destino, string extension, int star
 
     fprintf(GraphDot,"\n\n}");
     fclose(GraphDot);
+    fclose(FileDisk);
+    string comando = "dot -T"+extension+" DotReportes/Tree.dot -o "+destino;
+    system(comando.c_str());
+    cout << "\033[96m Reporte Tree generado con éxito :D \033[0m  " << endl;
+}
+
+
+
+void GraficarFILE(string PathDisk,string PathDestino,string extension,string nombre,string valRuta){
+    int ContadorParticion = FindPrimariaYExtendida(PathDisk,nombre);
+    if(ContadorParticion != -1){
+        MBR mbr;
+        char auxRuta[500];
+         strcpy(auxRuta,valRuta.c_str());
+        FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        int existe = buscarCarpetaArchivo(FileDisk,auxRuta);
+        if(existe != -1){
+            char nombrex[50];
+            char auxRuta[400];
+            strcpy(auxRuta,valRuta.c_str());
+            strcpy(nombrex,basename(auxRuta));
+            generarDotFile(PathDisk,PathDestino,extension,nombrex,mbr.mbr_partition[ContadorParticion].part_start,existe);
+        }
+        fclose(FileDisk);
+    }
+}
+
+void GraficarLS(string PathDisk,string PathDestino,string extension,string nombre,string Ruta){
+    int ContadorParticion = FindPrimariaYExtendida(PathDisk,nombre);
+    if(ContadorParticion != -1){
+        MBR mbr;
+        SuperBloque SB;
+        Tabla_Inodos inodo;
+        char auxRuta[500];
+        strcpy(auxRuta,Ruta.c_str());
+        FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        fseek(FileDisk,mbr.mbr_partition[ContadorParticion].part_start,SEEK_SET);
+        fread(&SB,sizeof(SuperBloque),1,FileDisk);
+        int existe = buscarCarpetaArchivo(FileDisk,auxRuta);
+        if(existe != -1){
+            char nombrex[50];
+            char auxRuta[400];
+            strcpy(auxRuta,Ruta.c_str());
+            strcpy(nombrex,basename(auxRuta));
+            fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*existe,SEEK_SET);
+            fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            Usuario user = getUsuario(PathDisk,mbr.mbr_partition[ContadorParticion].part_start,inodo.i_uid);
+            generarDotLs(PathDisk,PathDestino,extension,mbr.mbr_partition[ContadorParticion].part_start,existe,user,nombrex);
+        }
+        else{
+            cout << "ERROR: No se encuentra la ruta " << endl;
+        }            
+        fclose(FileDisk);
+    }
+}
+
+void generarDotFile(string direccion, string destino, string extension, string name,int start_super,int n){
+    FILE *FileDisk = fopen(direccion.c_str(),"r");
+
+    SuperBloque SB;
+    Tabla_Inodos inodo;
+    Bloque_Archivos archivo;
+
+    /*
+    Establecemos el puntero en el inicio del superbolque y luego en la tabla de inodos para obtenerla
+    */
+    fseek(FileDisk,start_super,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*n,SEEK_SET);
+    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+    /*
+    Empezamos a escribir el archivo para el dot que generara el reporte
+    */
+    FILE *GraphDot = fopen("DotReportes/File.dot","w");
+    fprintf(GraphDot,"digraph G{\n");
+    fprintf(GraphDot, "    nodo [shape=box3d, label=<");
+    fprintf(GraphDot, "   <table border=\'10\' cellborder='0\' cellspacing=\'1\' bgcolor=\"#13EBD4\">");
+    fprintf(GraphDot, "    <tr><td align=\"left\"> <b>%s</b> </td></tr>\n",name.c_str());
+    fprintf(GraphDot, "    <tr><td bgcolor=\"#C2E8E4\">");
+    for (int i = 0; i < 15; i++) {
+        /*
+        Recorremos todos los apuntadores 
+        */
+        if(inodo.i_block[i] != -1){
+            if(i == 12){
+                /*
+                Primero los 12 indirectos simples
+                */
+                BloqueDeApuntadores apuntador;
+                fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*inodo.i_block[i],SEEK_SET);
+                fread(&apuntador,sizeof(BloqueDeApuntadores),1,FileDisk);
+                for(int j = 0; j < 16; j++){
+                    if(apuntador.b_pointers[j] != -1){
+                        fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*apuntador.b_pointers[j],SEEK_SET);
+                        fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                        fprintf(GraphDot,"%s <br/>",archivo.b_content);
+                    }
+                }
+            }else{
+                /*
+                Apuntadores Directos
+                */
+                fseek(FileDisk,SB.s_block_start + static_cast<int>(sizeof(Bloque_Carpetas))*inodo.i_block[i],SEEK_SET);
+                fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+                fprintf(GraphDot,"%s <br/>",archivo.b_content);
+            }
+        }
+    }
+    fprintf(GraphDot, "    </td></tr>\n");
+    fprintf(GraphDot, "   </table>>]\n");
+    fprintf(GraphDot,"\n}");
+    fclose(GraphDot);
 
     fclose(FileDisk);
 
-    string comando = "dot -T"+extension+" DotReportes/Tree.dot -o "+destino;
+    string comando = "dot -T"+extension+" DotReportes/File.dot -o "+destino;
     system(comando.c_str());
-    cout << "Reporte Tree generado con exito " << endl;
+    cout << "Reporte file generado con exito " << endl;
 }
+
+void generarDotLs(string direccion, string destino, string extension, int start_super, int n, Usuario user, string name){
+    FILE *FileDisk = fopen(direccion.c_str(),"rb+");
+
+    SuperBloque SB;
+    Tabla_Inodos inodo;
+    /*
+    Leemos el superbloque y luego la tabla de inodos
+    */
+    fseek(FileDisk,start_super,SEEK_SET);
+    fread(&SB,sizeof(SuperBloque),1,FileDisk);
+    fseek(FileDisk,SB.s_inode_start + static_cast<int>(sizeof(Tabla_Inodos))*n,SEEK_SET);
+    fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+
+    FILE *GraphDot = fopen("DotReportes/Ls.dot","w");
+    fprintf(GraphDot,"digraph G{\n\n");
+    fprintf(GraphDot, "    nodo [ shape=box3d,  \n");
+    fprintf(GraphDot, "    label=< <table border=\'10\' cellborder=\'0\' cellspacing=\'2\' bgcolor=\"#13EBD4\">\n");
+    fprintf(GraphDot, "     <tr> <td><b>Permisos</b></td><td><b>Owner</b></td><td><b>Grupo</b></td><td><b>Size(Bytes)</b></td><td><b>Fecha</b></td><td><b>Hora</b></td><td><b>Tipo</b></td><td><b>Name</b></td> </tr>\n");
+
+    /*
+    Creamos variables para verificar los permisos y copiar al archivo dot
+    */
+    string auxPermisos = to_string(inodo.i_perm);
+    char propietario = auxPermisos[0];
+    char grupo = auxPermisos[1];
+    char otros = auxPermisos[2];
+    char permisos[50];
+
+    /*
+    PERMISOS PARA PROPIETARIO
+    */
+    if(propietario == '0')
+        strcpy(permisos,"---");
+    else if(propietario == '1')
+        strcpy(permisos,"--x");
+    else if(propietario == '2')
+        strcpy(permisos,"-w-");
+    else if(propietario == '3')
+        strcpy(permisos,"-wx");
+    else if(propietario == '4')
+        strcpy(permisos,"r--");
+    else if(propietario == '5')
+        strcpy(permisos,"r-x");
+    else if(propietario == '6')
+        strcpy(permisos,"rw-");
+    else if(propietario == '7')
+        strcpy(permisos,"rwx");
+
+    /*
+    PERMISOS PARA GRUPO
+    */
+    if(grupo == '0')
+        strcat(permisos," ---");
+    else if(grupo == '1')
+        strcat(permisos," --x");
+    else if(grupo == '2')
+        strcat(permisos," -w-");
+    else if(grupo == '3')
+        strcat(permisos," -wx");
+    else if(grupo == '4')
+        strcat(permisos," r--");
+    else if(grupo == '5')
+        strcat(permisos," r-x");
+    else if(grupo == '6')
+        strcat(permisos," rw-");
+    else if(grupo == '7')
+        strcat(permisos," rwx");
+
+    /*
+    PERMISOS PARA OTROS
+    */
+    if(otros == '0')
+        strcat(permisos," ---");
+    else if(otros == '1')
+        strcat(permisos," --x");
+    else if(otros == '2')
+        strcat(permisos," -w-");
+    else if(otros == '3')
+        strcat(permisos," -wx");
+    else if(otros == '4')
+        strcat(permisos," r--");
+    else if(otros == '5')
+        strcat(permisos," r-x");
+    else if(otros == '6')
+        strcat(permisos," rw-");
+    else if(otros == '7')
+        strcat(permisos," rwx");
+
+    fprintf(GraphDot,"<tr> <td bgcolor=\"#C2E8E4\">%s</td> ",permisos);
+    fprintf(GraphDot, "<td bgcolor=\"#C2E8E4\">%s</td>",user.username);
+    fprintf(GraphDot, "<td bgcolor=\"#C2E8E4\">%s</td>",user.group);
+    fprintf(GraphDot, "<td bgcolor=\"#C2E8E4\">%d</td>",inodo.i_size);
+
+    struct tm *tm;
+    char fecha[100];
+    tm=localtime(&inodo.i_atime);
+    strftime(fecha,100,"%d/%m/%y",tm);
+    fprintf(GraphDot, "<td bgcolor=\"#C2E8E4\">%s</td>",fecha);
+    strftime(fecha,100,"%H:%S",tm);
+    fprintf(GraphDot,"<td bgcolor=\"#C2E8E4\">%s</td>",fecha);
+    if(inodo.i_type == '0')
+        fprintf(GraphDot,"<td bgcolor=\"#C2E8E4\">%s</td>","Carpeta");
+    else if(inodo.i_type == '1')
+        fprintf(GraphDot,"<td bgcolor=\"#C2E8E4\">%s</td>","Archivo");
+    fprintf(GraphDot, "<td bgcolor=\"#C2E8E4\">%s</td> </tr>\n",name.c_str());
+
+    fprintf(GraphDot, "    </table>>]\n");
+    fprintf(GraphDot,"\n}");
+    fclose(GraphDot);
+
+    fclose(FileDisk);
+
+    string comando = "dot -T"+extension+" DotReportes/Ls.dot -o "+destino;
+    system(comando.c_str());
+    cout << "\033[96m Reporte Ls generado con éxito :D \033[0m  " << endl;
+}
+
+
 
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 

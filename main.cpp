@@ -85,6 +85,7 @@ int crearCarpeta(string , bool p);
 
 
 void GraficarMBR(string , string , string );
+void GraficarDISCO(string , string , string );
 void REPORTES(string ,string ,string ,string );
 string ObtenerExt(string );
 void CAT(string );
@@ -3969,7 +3970,7 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             if(NombreReporte == "MBR")
                 GraficarMBR(arreglonodos[i].path,DestinoReporte,extension);
             else if(NombreReporte == "DISK")
-                cout<<"Graficare disco :D"<<endl;
+                GraficarDISCO(arreglonodos[i].path,DestinoReporte,extension);
             else if(NombreReporte == "INODE"){
                 cout<<"Graficare inode :D"<<endl;
             }else if(NombreReporte == "JORUNALING"){
@@ -4010,11 +4011,11 @@ void GraficarMBR(string direccion, string destino, string extension){
     FILE *FileGraphDot;
     //Empezamos a llenar el archivo para la grafica del mbr
     if((FileDis = fopen(direccion.c_str(),"r"))){
-        FileGraphDot = fopen("grafica.dot", "w");
+        FileGraphDot = fopen("MBR.dot", "w");
         fprintf(FileGraphDot,"digraph G{ \n");
         fprintf(FileGraphDot,"subgraph cluster_0{\n label=\"REPORTE MBR\"");
         fprintf(FileGraphDot,"\nrepmbr[shape=box3d,label=<\n");
-        fprintf(FileGraphDot,"<table border=\'25\' cellborder=\'0\' cellspacing=\'15\' width=\'300\'  height=\'200\' >\n");//Establecemos con html el borde 
+        fprintf(FileGraphDot,"<table border=\'25\' cellborder=\'0\' cellspacing=\'15\' width=\'300\'  height=\'200\' color=\'#008B8B\' >\n");//Establecemos con html el borde 
         fprintf(FileGraphDot, "<tr>  <td width=\'150\'> <b>Atributo MBR</b> </td> <td width=\'150\'> <b>Valor</b> </td>  </tr>\n");
         MBR masterBoot;
         fseek(FileDis,0,SEEK_SET);
@@ -4066,51 +4067,195 @@ void GraficarMBR(string direccion, string destino, string extension){
         */
         if(index_Extendida != -1){
             int index_ebr = 1;
-            EBR extendedBoot;
+            EBR ebr;
             //posicionamos el arhivo donde inicia el mbr
             fseek(FileDis,masterBoot.mbr_partition[index_Extendida].part_start,SEEK_SET);
             /*
             Repetimos el ciclo hasta que se acaben las EBR activas
             */
-            while(fread(&extendedBoot,sizeof(EBR),1,FileDis)!=0 && (ftell(FileDis) < masterBoot.mbr_partition[index_Extendida].part_start + masterBoot.mbr_partition[index_Extendida].part_size)) {
-                if(extendedBoot.part_status != '1'){
+            while(fread(&ebr,sizeof(EBR),1,FileDis)!=0 && (ftell(FileDis) < masterBoot.mbr_partition[index_Extendida].part_start + masterBoot.mbr_partition[index_Extendida].part_size)) {
+                if(ebr.part_status != '1'){
                     /*
                     Si el estado del EBR es diferene de -1 repetimos 
                     */
                     fprintf(FileGraphDot,"subgraph cluster_%d{\n label=\"EBR_Numero_%d\"\n",index_ebr,index_ebr);
                     fprintf(FileGraphDot,"\nrepmbr_%d[shape=box3d,label=<\n ",index_ebr);//agregamos el numero del ebr a cada nodo
-                    fprintf(FileGraphDot, "<table border=\'25\' cellborder=\'1\' cellspacing=\'15\'  width=\'300\' height=\'160\' >\n ");
+                    fprintf(FileGraphDot, "<table border=\'25\' cellborder=\'1\' cellspacing=\'15\'  width=\'300\' height=\'160\' color=\'#008B8B\' >\n ");
                     fprintf(FileGraphDot, "<tr>  <td width=\'150\'><b>Atributo EBR</b></td> <td width=\'150\'><b>Valor</b></td>  </tr>\n");
                     char status[3];
-                    if(extendedBoot.part_status == '0')//copiamos estado
+                    if(ebr.part_status == '0')//copiamos estado
                         strcpy(status,"0");
-                    else if(extendedBoot.part_status == '2')//copiamos estado
+                    else if(ebr.part_status == '2')//copiamos estado
                         strcpy(status,"2");
                     fprintf(FileGraphDot, "<tr>  <td><b>part_status_1</b></td> <td>%s</td>  </tr>\n",status);
-                    fprintf(FileGraphDot, "<tr>  <td><b>part_fit_1</b></td> <td>%c</td>  </tr>\n",extendedBoot.part_fit);
-                    fprintf(FileGraphDot, "<tr>  <td><b>part_start_1</b></td> <td>%d</td>  </tr>\n",extendedBoot.part_start);
-                    fprintf(FileGraphDot, "<tr>  <td><b>part_size_1</b></td> <td>%d</td>  </tr>\n",extendedBoot.part_size);
-                    fprintf(FileGraphDot, "<tr>  <td><b>part_next_1</b></td> <td>%d</td>  </tr>\n",extendedBoot.part_next);
-                    fprintf(FileGraphDot, "<tr>  <td><b>part_name_1</b></td> <td>%s</td>  </tr>\n",extendedBoot.part_name);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_fit_1</b></td> <td>%c</td>  </tr>\n",ebr.part_fit);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_start_1</b></td> <td>%d</td>  </tr>\n",ebr.part_start);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_size_1</b></td> <td>%d</td>  </tr>\n",ebr.part_size);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_next_1</b></td> <td>%d</td>  </tr>\n",ebr.part_next);
+                    fprintf(FileGraphDot, "<tr>  <td><b>part_name_1</b></td> <td>%s</td>  </tr>\n",ebr.part_name);
                     fprintf(FileGraphDot, "</table>\n");
                     fprintf(FileGraphDot, ">];\n}\n");
                     index_ebr++;//Sumamos para pasar al siguiente ebr
                 }
 
-                if(extendedBoot.part_next == -1)//paramos en dado caso la logica este en estado -1
+                if(ebr.part_next == -1)//paramos en dado caso la logica este en estado -1
                     break;
                 else
-                    fseek(FileDis,extendedBoot.part_next,SEEK_SET);//Posicionamos el puntero del ardchivo al siguiente
+                    fseek(FileDis,ebr.part_next,SEEK_SET);//Posicionamos el puntero del ardchivo al siguiente
             }
         }
         fprintf(FileGraphDot,"}\n");//cerramos el dot
         fclose(FileGraphDot);//cerramos el file del dot
         fclose(FileDis);//cerramos archivo del disco
-        string comando = "dot -T"+extension+" grafica.dot -o "+destino;
+        string comando = "dot -T"+extension+" MBR.dot -o "+destino;
         system(comando.c_str());//ejecutamos el comando para crear el dot y ejecutarlo 
         cout << "\033[96m Reporte MBR generado con éxito :D \033[0m " << endl;
     }
 }
+
+/*
+Metodo llamado para graficar disco
+*/
+void GraficarDISCO(string PathDisk,string PathDestino, string extension ){
+    FILE *FileDisk;
+    FILE *FileGraphDot;
+    if((FileDisk = fopen(PathDisk.c_str(),"r"))){//Verificamos si existe el disco
+
+        /*
+        Abrimos el archivo en Disk.dot en modo escritura, y empezamos el encabezado del dot a;adiendo el inicio de la tabla para el reporte
+        */
+        FileGraphDot = fopen("Disk.dot","w");
+        fprintf(FileGraphDot,"digraph G{\n\n");
+        fprintf(FileGraphDot, "repdisk[\nshape=box3d\n label=<\n");
+        fprintf(FileGraphDot, "<table border=\'10\' cellborder=\'1\' width=\'600\' height=\"200\" color=\'#20B2AA\'>\n");
+        fprintf(FileGraphDot, "<tr>\n");
+        fprintf(FileGraphDot, "<td height=\'200\' width=\'100\'> MBR </td>\n");
+        MBR mbr;
+        /*
+        Apuntamos el mbr al inicio y le asignamos el tamanio del mbr para luego leerlo completo
+        */
+        fseek(FileDisk,0,SEEK_SET);
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        int Tamanio_mbr = mbr.mbr_tamano;// igualamos la variable al tamanio del mbr total
+        double Usado = 0;//declaramos variable para ver cuanto se va usando nos servira para los porcentajes
+        for(int i = 0; i < 4; i++){//Recorremos las 4 particiones posibles
+            int a = mbr.mbr_partition[i].part_size;//Igualamos al tamanio de la particion
+            if(mbr.mbr_partition[i].part_start != -1){//Particion no vacia
+                double RealPorcentaje = (a*100)/Tamanio_mbr;//Sacamos el porcentaje utilizado del disco
+                double ancho = (RealPorcentaje*500)/100;
+                /*
+                Estos 2 porcentajes nos serviran para imprimir el porcentaje utilizado y para dal el tamanio al td.
+                */
+                Usado += RealPorcentaje;
+                if(mbr.mbr_partition[i].part_status != '1'){
+                    if(mbr.mbr_partition[i].part_type == 'P'){
+                        fprintf(FileGraphDot, "     <td height=\'200\' width=\'%.1f\'>PRIMARIA <br/> Ocupado: %.1f%c</td>\n",ancho,RealPorcentaje,'%');
+                        //Verificar que no haya espacio fragmentado
+                        if(i!=3){
+                            int p1 = mbr.mbr_partition[i].part_start + mbr.mbr_partition[i].part_size;
+                            int p2 = mbr.mbr_partition[i+1].part_start;
+                            if(mbr.mbr_partition[i+1].part_start != -1){
+                                if((p2-p1)!=0){//Hay fragmentacion
+                                    int fragmentacion = p2-p1;
+                                    double RealPorcentaje = (fragmentacion*100)/Tamanio_mbr;
+                                    double ancho = (RealPorcentaje*500)/100;
+                                    fprintf(FileGraphDot,"<td height=\'200\' width=\'%.1f\'>LIBRE<br/> Ocupado: %.1f%c</td>\n",ancho,RealPorcentaje,'%');
+                                }
+                            }
+
+                        }else{
+                            int p1 = mbr.mbr_partition[i].part_start + mbr.mbr_partition[i].part_size;
+                            int mbr_tamano = Tamanio_mbr + (int)sizeof(MBR);
+                            if((mbr_tamano-p1)!=0){
+                                double libre = (mbr_tamano - p1) + sizeof(MBR);
+                                double RealPorcentaje = (libre*100)/Tamanio_mbr;
+                                double ancho = (RealPorcentaje*500)/100;
+                                fprintf(FileGraphDot, "     <td height=\'200\' width=\'%.1f\'>LIBRE<br/> Ocupado: %.1f%c</td>\n",ancho, RealPorcentaje, '%');
+                            }
+                        }
+                    }else{//si hay extendida 
+                        EBR ebr;
+                        /*
+                        Escribimos el encabezado para las extendidas
+                        */
+                        fprintf(FileGraphDot,"<td  height=\'200\' width=\'%.1f\'>\n     <table border=\'0\'  height=\'200\' WIDTH=\'%.1f\' cellborder=\'1\'>\n",RealPorcentaje,RealPorcentaje);
+                        fprintf(FileGraphDot," <tr>  <td height=\'60\' colspan=\'15\'>EXTENDIDA</td>  </tr>\n     <tr>\n");
+                        /*
+                        Apuntamos en la posicon donde empieza la extendida y leemos todo el EBR
+                        */
+                        fseek(FileDisk, mbr.mbr_partition[i].part_start,SEEK_SET);
+                        fread(&ebr,sizeof(EBR),1,FileDisk);
+                        if(ebr.part_size != 0){//Aqui entrara si encuentra una logica 
+                            /*
+                            Apuntamos el archivo a la particion extendida y vamos leyendo ebr por ebr hasta que se vaan acabando las logicas 
+                            */
+                            fseek(FileDisk, mbr.mbr_partition[i].part_start,SEEK_SET);
+                            while(fread(&ebr,sizeof (EBR),1,FileDisk)!=0 && (ftell(FileDisk) < (mbr.mbr_partition[i].part_start + mbr.mbr_partition[i].part_size))){
+                                a = ebr.part_size;
+                                RealPorcentaje = (a*100)/Tamanio_mbr;
+                                if(RealPorcentaje!=0){
+                                    if(ebr.part_status != '1'){
+                                        fprintf(FileGraphDot, "<td height=\'140\'>EBR</td>\n");
+                                        fprintf(FileGraphDot, "<td height=\'140\'>LOGICA<br/>Ocupado: %.1f%c</td>\n",RealPorcentaje,'%');
+                                    }else{//Espacio no asignado
+                                        fprintf(FileGraphDot, "<td height=\'150\'>LIBRE 1 <br/> Ocupado: %.1f%c</td>\n",RealPorcentaje,'%');
+                                    }
+                                    if(ebr.part_next==-1){
+                                        a = (mbr.mbr_partition[i].part_start + mbr.mbr_partition[i].part_size) - (ebr.part_start + ebr.part_size);
+                                        RealPorcentaje = (a*100)/Tamanio_mbr;
+                                        if(RealPorcentaje!=0){
+                                            fprintf(FileGraphDot, " <td height=\'150\'>LIBRE 2<br/> Ocupado: %.1f%c </td>\n",RealPorcentaje,'%');
+                                        }
+                                        break;
+                                    }else
+                                    //Apuntamos hacia la siguiente logica para cuadno vuelva a entrar al while
+                                        fseek(FileDisk,ebr.part_next,SEEK_SET);
+                                }
+                            }
+                        }else{
+                            fprintf(FileGraphDot,"<td height=\'140\'> Ocupado %.1f%c</td>",RealPorcentaje,'%');//Por si no hay logicas
+                        }
+                        fprintf(FileGraphDot,"</tr>\n</table>\n</td>\n");//Cerramos nuestras etiquetas
+                        //Verificar que no haya espacio fragmentado
+                        if(i!=3){
+                            int p1 = mbr.mbr_partition[i].part_start + mbr.mbr_partition[i].part_size;
+                            int p2 = mbr.mbr_partition[i+1].part_start;
+                            if(mbr.mbr_partition[i+1].part_start != -1){
+                                if((p2-p1)!=0){//Hay fragmentacion
+                                    int fragmentacion = p2-p1;
+                                    double RealPorcentaje = (fragmentacion*100)/Tamanio_mbr;
+                                    double ancho = (RealPorcentaje*500)/100;
+                                    fprintf(FileGraphDot,"<td height=\'200\' width=\'%.1f\'>LIBRE<br/> Ocupado: %.1f%c</td>\n",ancho,RealPorcentaje,'%');
+                                }
+                            }
+                        }else{
+                            int p1 = mbr.mbr_partition[i].part_start + mbr.mbr_partition[i].part_size;
+                            int mbr_tamano = Tamanio_mbr + (int)sizeof(MBR);
+                            if((mbr_tamano-p1)!=0){//Libre
+                                double libre = (mbr_tamano - p1) + sizeof(MBR);
+                                double RealPorcentaje = (libre*100)/Tamanio_mbr;
+                                double ancho = (RealPorcentaje*500)/100;
+                                fprintf(FileGraphDot, "<td height=\'200\' width=\'%.1f\'>LIBRE<br/> Ocupado: %.1f%c</td>\n",ancho, RealPorcentaje, '%');
+                            }
+                        }
+                    }
+                }else{//Espacio no asignado
+                     fprintf(FileGraphDot,"<td height=\'200\' width=\'%.1f\'>LIBRE <br/> Ocupado: %.1f%c</td>\n",ancho,RealPorcentaje,'%');
+                }
+            }
+        }
+
+        fprintf(FileGraphDot,"</tr>\n</table> \n>];\n\n}");//Cerramos etiquetas principales del dot
+        fclose(FileGraphDot);//Cerramos archivo dot luego de escribirlo
+        fclose(FileDisk);//Cerramos el archivo del disco
+        string comando = "dot -T"+extension+" Disk.dot -o "+PathDestino;
+        system(comando.c_str());//Ejecutamos el .dot para crear la imagen.
+        cout << "\033[96m Reporte DISCO generado con éxito :D \033[0m  " << endl;
+    }else{
+        cout << "\033[91m Error: No se encontro el disco deseado para hacer el reporte\033[0m" << endl;
+}
+}
+
 
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 

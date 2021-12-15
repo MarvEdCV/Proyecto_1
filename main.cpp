@@ -88,6 +88,8 @@ void GraficarMBR(string , string , string );
 void GraficarDISCO(string , string , string );
 void REPORTES(string ,string ,string ,string );
 string ObtenerExt(string );
+void GraficarINODE(string ,string ,string,string );
+void generarDotINODE(string , string , string ,int ,int ,int );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -3972,7 +3974,7 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             else if(NombreReporte == "DISK")
                 GraficarDISCO(arreglonodos[i].path,DestinoReporte,extension);
             else if(NombreReporte == "INODE"){
-                cout<<"Graficare inode :D"<<endl;
+                 GraficarINODE(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name);
             }else if(NombreReporte == "JORUNALING"){
                 cout<<"Graficare Journaling :D"<<endl;
             }else if(NombreReporte == "BLOCK"){
@@ -4023,13 +4025,13 @@ void GraficarMBR(string direccion, string destino, string extension){
         int tamano = masterBoot.mbr_tamano;
         fprintf(FileGraphDot,"<tr>  <td><b>mbr_tamaño</b></td><td>%d</td>  </tr>\n",tamano);
         struct tm *tm;
-        char fecha[100];
+        char date[100];
         tm = localtime(&masterBoot.mbr_fecha_creacion);
         /*
         Establecemos los subtitulos de los diferentes atributos para llenar
         */
-        strftime(fecha,100,"%d/%m/%y %H:%S",tm);//Hora de generacion de mbr
-        fprintf(FileGraphDot,"<tr>  <td><b>mbr_fecha_creacion</b></td> <td>%s</td>  </tr>\n",fecha);
+        strftime(date,100,"%d/%m/%y %H:%S",tm);//Hora de generacion de mbr
+        fprintf(FileGraphDot,"<tr>  <td><b>mbr_fecha_creacion</b></td> <td>%s</td>  </tr>\n",date);
         fprintf(FileGraphDot,"<tr>  <td><b>mbr_disk_signature</b></td> <td>%d</td>  </tr>\n",masterBoot.mbr_disk_signature);
         fprintf(FileGraphDot,"<tr>  <td><b>disk_fit</b></td> <td>%c</td>  </tr>\n",masterBoot.disk_fit);
 
@@ -4256,6 +4258,110 @@ void GraficarDISCO(string PathDisk,string PathDestino, string extension ){
 }
 }
 
+void GraficarINODE(string PathDisk,string PathDestino,string extension,string nombre){
+    /*
+    Buscamos el indice donde se encuentran las primarias o extendidas.
+    */
+    int Numero = FindPrimariaYExtendida(PathDisk,nombre);
+    if(Numero != -1){
+        MBR mbr;
+        SuperBloque SB;
+        /*
+        Abrimos el archivo de el disco y leemos todo el mbr
+        */
+        FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
+        fread(&mbr,sizeof(MBR),1,FileDisk);
+        /*
+        Apuntamos el archivo en la posicion de la particion primaria  o logica encontrada y leemos el superbloque.
+        */
+        fseek(FileDisk,mbr.mbr_partition[Numero].part_start,SEEK_SET);
+        fread(&SB,sizeof(SuperBloque),1,FileDisk);//Leemos el super bloque para mandar sus atributos al metodo que genera el dot
+        fclose(FileDisk);//Cerramos el archivo del disco
+        generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el super bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
+    }else{//Si es logica 
+        int Numero = FindLogic(PathDisk,nombre);
+        if(Numero != -1){
+            /*
+            Realizamos la misma accion de arriba solo que apuntamos hacia el EBR y leemos el superbloque de la logica para enviarlo al siguiente metodo
+            */
+            EBR ebr;
+            SuperBloque SB;
+            FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
+            fseek(FileDisk,Numero,SEEK_SET);
+            fread(&ebr,sizeof(EBR),1,FileDisk);
+            fread(&SB,sizeof(SuperBloque),1,FileDisk);
+            fclose(FileDisk);
+            generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);
+        }
+    }
+}
+void generarDotINODE(string PathDisk, string PathDestino, string extension,int bm_inode_start,int inode_start,int bm_block_start){
+    FILE *FileDisk = fopen(PathDisk.c_str(), "r");
+
+    Tabla_Inodos inodo;//Creamos un objeto de tipo de tabla de inodos para leer
+    int InicioBitmapInodos = bm_inode_start;
+    int i = 0;
+    char buffer;
+    /*
+    Creamos el archivo dot donde generaremos el codigo..
+    */
+    FILE *GraphDot = fopen("Inode.dot","w");
+    fprintf(GraphDot,"digraph G{\n\n");
+    /*
+    Se repetira mientras El inicio del bitmap de inodos sea menor a el inicio del bitmap de bloques
+    */
+    while(InicioBitmapInodos < bm_block_start){
+        /*
+        Apuntamos el archivo del disco al inicio del bitmap de inodos y aumentamos al siguiente bitmap
+        */
+        fseek(FileDisk,bm_inode_start + i,SEEK_SET);
+        buffer = static_cast<char>(fgetc(FileDisk));//para verificar que no este vacio.
+        InicioBitmapInodos++;
+        if(buffer == '1'){
+            /*
+            Posicionamos el puntero en el inicio del inodo para leerlo y asi poder obtener los datos 
+            */
+            fseek(FileDisk,inode_start + static_cast<int>(sizeof(Tabla_Inodos))*i,SEEK_SET);
+            fread(&inodo,sizeof(Tabla_Inodos),1,FileDisk);
+            fprintf(GraphDot, "    inodo_%d [ shape=folder label=<\n",i);
+            fprintf(GraphDot, "   <table border=\'10\' cellborder=\'1\' cellspacing=\'2\' bgcolor=\"gray\">");
+            fprintf(GraphDot, "    <tr> <td colspan=\'2\'> <b>Inodo %d</b> </td></tr>\n",i);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_uid </td> <td bgcolor=\"#F5F5F5\"> %d </td>  </tr>\n",inodo.i_uid);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_gid </td> <td bgcolor=\"#F5F5F5\"> %d </td>  </tr>\n",inodo.i_gid);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_size </td> <td bgcolor=\"#F5F5F5\"> %d </td> </tr>\n",inodo.i_size);
+
+            //Obtenemos los tiempos solicitados  y los imprimimos en el dot.
+            struct tm *tm;//Estructura de tipo tiempo
+            char date[100];
+            tm=localtime(&inodo.i_atime);
+            strftime(date,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_atime </td> <td bgcolor=\"#F5F5F5\"> %s </td>  </tr>\n",date);
+            tm=localtime(&inodo.i_ctime);
+            strftime(date,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_ctime </td> <td bgcolor=\"#F5F5F5\"> %s </td>  </tr>\n",date);
+            tm=localtime(&inodo.i_mtime);
+            strftime(date,100,"%d/%m/%y %H:%S",tm);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_mtime </td> <td bgcolor=\"#F5F5F5\"> %s </td></tr>\n",date);
+            /*
+            recorremos para los apuntadores directos...
+            */
+            for(int b = 0; b < 15; b++)
+                fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_block_%d </td> <td bgcolor=\"#F5F5F5\"> %d </td> </tr>\n",b,inodo.i_block[b]);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_type </td> <td bgcolor=\"#F5F5F5\"> %c </td> </tr>\n",inodo.i_type);
+            fprintf(GraphDot, "    <tr> <td bgcolor=\"gray\"> i_perm </td> <td bgcolor=\"#F5F5F5\"> %d </td> </tr>\n",inodo.i_perm);
+            fprintf(GraphDot, "   </table>>]\n");
+        }
+        i++;
+    }
+    fprintf(GraphDot,"\n}");
+    fclose(GraphDot);
+
+    fclose(FileDisk);
+
+    string comando = "dot -T"+extension+" Inode.dot -o "+PathDestino;
+    system(comando.c_str());
+    cout << "\033[96m Reporte Inodos generado con éxito :D \033[0m   " << endl;
+}
 
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 

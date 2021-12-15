@@ -88,11 +88,12 @@ void GraficarMBR(string , string , string );
 void GraficarDISCO(string , string , string );
 void REPORTES(string ,string ,string ,string );
 string ObtenerExt(string );
-void GraficarINODE(string ,string ,string,string );
+void GraficarINODEYBLOCK(string ,string ,string,string,string);
 void generarDotINODE(string , string , string ,int ,int ,int );
 
 void GraficarJOURNALING(string ,string ,string ,string );
 void generarDotJOURNALING(string ,string , string ,int );
+void generarDotBLOCK(string , string , string , int , int , int );
 void CAT(string );
 vector<string> Mkfsids;
 
@@ -3970,11 +3971,11 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             else if(NombreReporte == "DISK")
                 GraficarDISCO(arreglonodos[i].path,DestinoReporte,extension);
             else if(NombreReporte == "INODE"){
-                 GraficarINODE(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name);
+                 GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "JOURNALING"){
                 GraficarJOURNALING(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name);
             }else if(NombreReporte == "BLOCK"){
-                cout<<"Graficare block :D"<<endl;
+                GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "BM_INODE"){
                 cout<<"Graficare bm_inode :D"<<endl;
             }else if(NombreReporte == "BM_BLOCH"){
@@ -4254,9 +4255,9 @@ void GraficarDISCO(string PathDisk,string PathDestino, string extension ){
 }
 }
 /*
-Metodo que recorre el disco para extaer los datos de los super bloques
+Metodo que recorre el disco para extaer los datos de los SB bloques tambien utilizado para los bloques para reutilizar codigo...
 */
-void GraficarINODE(string PathDisk,string PathDestino,string extension,string nombre){
+void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,string nombre,string operacion){
     /*
     Buscamos el indice donde se encuentran las primarias o extendidas.
     */
@@ -4273,10 +4274,14 @@ void GraficarINODE(string PathDisk,string PathDestino,string extension,string no
         Apuntamos el archivo en la posicion de la particion primaria  o logica encontrada y leemos el superbloque.
         */
         fseek(FileDisk,mbr.mbr_partition[Numero].part_start,SEEK_SET);
-        fread(&SB,sizeof(SuperBloque),1,FileDisk);//Leemos el super bloque para mandar sus atributos al metodo que genera el dot
+        fread(&SB,sizeof(SuperBloque),1,FileDisk);//Leemos el SB bloque para mandar sus atributos al metodo que genera el dot
         fclose(FileDisk);//Cerramos el archivo del disco
-        generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el super bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
-    }else{//Si es logica 
+        if(operacion=="INODE"){
+            generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el SB bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
+        }else if(operacion=="BLOCK"){
+            generarDotBLOCK(PathDisk,PathDestino,extension,SB.s_bm_block_start,SB.s_block_start,SB.s_inode_start);
+        }
+         }else{//Si es logica 
         int Numero = FindLogic(PathDisk,nombre);
         if(Numero != -1){
             /*
@@ -4289,7 +4294,11 @@ void GraficarINODE(string PathDisk,string PathDestino,string extension,string no
             fread(&ebr,sizeof(EBR),1,FileDisk);
             fread(&SB,sizeof(SuperBloque),1,FileDisk);
             fclose(FileDisk);
-            generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);
+           if(operacion=="INODE"){
+            generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el SB bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
+        }else if(operacion=="BLOCK"){
+            generarDotBLOCK(PathDisk,PathDestino,extension,SB.s_bm_block_start,SB.s_block_start,SB.s_inode_start);
+        }
         }
     }
 }
@@ -4375,7 +4384,7 @@ void GraficarJOURNALING(string PathDisk,string PathDestino,string extension,stri
         MBR mbr;
         SuperBloque SB;
         /*
-        Abrimos el disco para obtener el super bloque y de ahi obtener la posicion donde empieza   y la enviamos para el otro metodo
+        Abrimos el disco para obtener el SB bloque y de ahi obtener la posicion donde empieza   y la enviamos para el otro metodo
         */
         FILE *FileDisk = fopen(PathDisk.c_str(),"rb+");
         fread(&mbr,sizeof(MBR),1,FileDisk);
@@ -4442,6 +4451,93 @@ void generarDotJOURNALING(string direccion,string destino, string extension,int 
     system(comando.c_str());
     cout << "\033[96m Reporte Journal generado con éxito :D \033[0m " << endl;
 }
+
+
+/*
+Metodo que crea el .dot para generar la grafica del bloque
+*/
+void generarDotBLOCK(string PathDisk, string PathDestino, string extension, int bm_block_start, int block_start, int inode_start){
+    /*
+    Iniiamos el disco (abrimos) y cremos 3 objetos de los cuales esta compuesto el bloque, que son carpeta, archivo y apuntadores.
+    */
+    FILE *FileDisk = fopen(PathDisk.c_str(),"r");
+    Bloque_Carpetas carpeta;
+    Bloque_Archivos archivo;
+    BloqueDeApuntadores Puntero;
+
+    int InicioBitMapBlock = bm_block_start;
+    int i = 0;
+    char buffer;
+
+    /*
+    Abrimos el archivo donde crearemos el dot 
+    */
+    FILE *graph = fopen("Block.dot","w");
+    fprintf(graph,"digraph G{\n\n");
+    /*
+    Se repetira mientras el inicio del bitmap sea menor al bit inicial del inodo
+    */
+    while(InicioBitMapBlock < inode_start){
+        /*
+        Posicionamos el archivo del disco en el punto inicial del bloque
+        */
+        fseek(FileDisk,bm_block_start + i,SEEK_SET);
+        buffer = static_cast<char>(fgetc(FileDisk));
+        InicioBitMapBlock++;
+        if(buffer == '1'){//mientras sea de tipo bloque carpeta
+            /*
+            posicionamos al inicio del bloque decarpetas
+            leemos el bloque de carpetas
+            */
+            fseek(FileDisk,block_start + static_cast<int>(sizeof(Bloque_Carpetas))*i,SEEK_SET);
+            fread(&carpeta,sizeof(Bloque_Carpetas),1,FileDisk);
+            /*
+            empezamos a escribir en el dot ya que podemos obtener los datos necesarios.
+            */
+            fprintf(graph, "    nodo_%d [ shape=tab,  label=< \n",i);
+            fprintf(graph, "   <table border=\'0\' cellborder='1' cellspacing='0' bgcolor=\"gray\">");
+            fprintf(graph, "    <tr> <td colspan=\'2\'> <b>Rep Bloque Carpetas_ %d</b> </td></tr>\n",i);
+            fprintf(graph, "    <tr> <td bgcolor=\"#708090\"> b_name </td> <td bgcolor=\"#708090\"> b_inode </td></tr>\n");
+            
+            for(int j = 0;j < 4;j++)
+                fprintf(graph, "    <tr> <td bgcolor=\"#FFF5EE\"> %s </td> <td bgcolor=\"#FFF5EE\"> %d </td></tr>\n",carpeta.b_content[j].b_name,carpeta.b_content[j].b_inodo);
+            fprintf(graph, "   </table>>]\n\n");
+            /*
+            En el caso de ue el buffer sea 2 o 3 siguen la misma logica ue cuando es tipo bloque carpeta!!
+            */
+        }else if(buffer == '2'){//mientras sea de tipo bloque archivo
+            fseek(FileDisk,block_start + static_cast<int>(sizeof(Bloque_Archivos))*i,SEEK_SET);
+            fread(&archivo,sizeof(Bloque_Archivos),1,FileDisk);
+            fprintf(graph, "    nodo_%d [ shape=tab, label=< \n",i);
+            fprintf(graph, "   <table border=\'0\' cellborder='1' cellspacing='0' bgcolor=\"#8B0000\">");
+            fprintf(graph, "    <tr> <td colspan=\'2\'> <b>Bloque Archivo %d </b></td></tr>\n",i);
+            fprintf(graph, "    <tr> <td colspan=\'2\' bgcolor=\"#FFF5EE\"> %s </td></tr>\n",archivo.b_content);
+            fprintf(graph, "   </table>>]\n\n");
+        }else if(buffer == '3'){//Mientras sea de tipo apuntadores 
+            fseek(FileDisk,block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*i,SEEK_SET);
+            fread(&Puntero,sizeof(BloqueDeApuntadores),1,FileDisk);
+            fseek(FileDisk,block_start + static_cast<int>(sizeof(BloqueDeApuntadores))*i,SEEK_SET);
+            fread(&Puntero,sizeof(BloqueDeApuntadores),1,FileDisk);
+            fprintf(graph, "    bloque_%d [shape=plaintext  label=< \n",i);
+            fprintf(graph, "   <table border=\'0\' bgcolor=\"#FF0000\">\n");
+            fprintf(graph, "    <tr> <td> <b>Bloque de punteros %d</b></td></tr>\n",i);
+            for(int j = 0; j < 16; j++)
+                fprintf(graph, "    <tr> <td bgcolor=\"#FFF5EE\">%d</td> </tr>\n",Puntero.b_pointers[j]);
+            fprintf(graph, "   </table>>]\n\n");
+        }
+        i++;//contador de indexacion
+    }
+
+    fprintf(graph,"\n}");
+    fclose(graph);
+
+    fclose(FileDisk);
+
+    string comando = "dot -T"+extension+" Block.dot -o "+PathDestino;
+    system(comando.c_str());
+    cout << "\033[96m Reporte Block generado con éxito :D \033[0m " << endl;
+}
+
 /*
 Metodo que ejecuta el proyecto con un poco de logica por si viene EXEC 
 */

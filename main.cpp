@@ -99,6 +99,7 @@ void generarDotTree(string , string , string , int );
 void GraficarFILE(string ,string ,string ,string,string );
 void GraficarLS(string ,string ,string ,string ,string);
 void generarDotFile(string , string , string , string ,int ,int );
+void generarBitmap(string , string , int , int );
 
 
 void CAT(string );
@@ -4054,9 +4055,9 @@ void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorPar
             }else if(NombreReporte == "BLOCK"){
                 GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "BM_INODE"){
-                cout<<"Graficare bm_inode :D"<<endl;
-            }else if(NombreReporte == "BM_BLOCH"){
-                cout<<"Graficare bm_block :D"<<endl;
+                GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
+            }else if(NombreReporte == "BM_BLOCK"){
+                GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "TREE"){
                 GraficarINODEYBLOCK(arreglonodos[i].path,DestinoReporte,extension,arreglonodos[i].name,NombreReporte);
             }else if(NombreReporte == "SB"){
@@ -4362,6 +4363,10 @@ void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,str
             generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el SB bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
         }else if(operacion=="BLOCK"){
             generarDotBLOCK(PathDisk,PathDestino,extension,SB.s_bm_block_start,SB.s_block_start,SB.s_inode_start);
+        }else if(operacion == "BM_INODE"){
+            generarBitmap(PathDisk,PathDestino,SB.s_bm_inode_start,SB.s_inodes_count);
+        }else if(operacion == "BM_BLOCK"){
+            generarBitmap(PathDisk,PathDestino,SB.s_bm_block_start,SB.s_blocks_count);
         }
          }else{//Si es logica 
         int Numero = FindLogic(PathDisk,nombre);
@@ -4388,6 +4393,10 @@ void GraficarINODEYBLOCK(string PathDisk,string PathDestino,string extension,str
             generarDotINODE(PathDisk,PathDestino,extension,SB.s_bm_inode_start,SB.s_inode_start,SB.s_bm_block_start);//Mandamos el SB bloque para leer los inodos en el siguiente metodo, de particiones primarias y extendidas
         }else if(operacion=="BLOCK"){
             generarDotBLOCK(PathDisk,PathDestino,extension,SB.s_bm_block_start,SB.s_block_start,SB.s_inode_start);
+        }else if(operacion == "BM_INODE"){
+            generarBitmap(PathDisk,PathDestino,SB.s_bm_inode_start,SB.s_inodes_count);
+        }else if(operacion == "BM_BLOCK"){
+            generarBitmap(PathDisk,PathDestino,SB.s_bm_block_start,SB.s_blocks_count);
         }
         }
     }
@@ -5124,6 +5133,36 @@ void generarDotLs(string direccion, string destino, string extension, int start_
     cout << "\033[96m Reporte Ls generado con éxito :D \033[0m  " << endl;
 }
 
+
+void generarBitmap(string direccion, string destino, int start_bm, int n){
+    FILE *fp = fopen(direccion.c_str(),"rb+");
+
+    /*
+    Se lee el bitmap desde el inicio y se recorre verificando si el byte almacenado es 0 o 1 para irlo imprimiento de 20 en 20
+    */
+    char byte;
+    FILE *report = fopen(destino.c_str(),"w+");
+    fseek(report,0,SEEK_SET);
+    int cont = 0;
+
+    for (int i = 0; i < n; i++) {
+        fseek(fp,start_bm + i,SEEK_SET);
+        byte = static_cast<char>(fgetc(fp));
+        if(byte == '0')
+            fprintf(report,"0 ");
+        else
+            fprintf(report,"1 ");
+        if(cont == 19){
+            cont = 0;
+            fprintf(report, "\n");
+        }else
+            cont++;
+    }
+    fclose(report);
+
+    fclose(fp);
+    cout << "\033[96m Reporte de generacion de bitmaps creado con exito generado con éxito :D \033[0m" << endl;
+}
 
 
 /*

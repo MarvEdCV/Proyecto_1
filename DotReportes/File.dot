@@ -1,0 +1,15 @@
+digraph G{
+    nodo [shape=box3d, label=<   <table border='10' cellborder='0' cellspacing='1' bgcolor="#13EBD4">    <tr><td align="left"> <b>users.txt</b> </td></tr>
+    <tr><td bgcolor="#C2E8E4">1,G,root
+1,U,root,root,123
+2,G,Archivos
+0,G,SA
+4,G,Comp
+5,G,Gru <br/>po1
+2,U,root,user1,user1
+3,U,Comp,user2,user2
+0,U,Comp,user3,us <br/>er3
+ <br/>    </td></tr>
+   </table>>]
+
+}

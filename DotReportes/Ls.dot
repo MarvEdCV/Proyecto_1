@@ -1,0 +1,9 @@
+digraph G{
+
+    nodo [ shape=box3d,  
+    label=< <table border='10' cellborder='0' cellspacing='2' bgcolor="#13EBD4">
+     <tr> <td><b>Permisos</b></td><td><b>Owner</b></td><td><b>Grupo</b></td><td><b>Size(Bytes)</b></td><td><b>Fecha</b></td><td><b>Hora</b></td><td><b>Tipo</b></td><td><b>Name</b></td> </tr>
+<tr> <td bgcolor="#C2E8E4">rw- rw- r--</td> <td bgcolor="#C2E8E4">root</td><td bgcolor="#C2E8E4">root</td><td bgcolor="#C2E8E4">0</td><td bgcolor="#C2E8E4">15/12/21</td><td bgcolor="#C2E8E4">17:59</td><td bgcolor="#C2E8E4">Carpeta</td><td bgcolor="#C2E8E4">usac</td> </tr>
+    </table>>]
+
+}

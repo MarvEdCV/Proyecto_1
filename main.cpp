@@ -21,6 +21,7 @@
 #include <string>
 #include <filesystem>
 #include <libgen.h>
+#include <vector>
 
 using namespace std;
 using std::cout; using std::cin;
@@ -33,13 +34,11 @@ void PaticionExtendida(int,char,string,char,string);
 void ParticionLogica(int,char,string,char,string);
 bool ExisteParticion(string,string);
 void MontarParticion(string,string);
-
 int FindLogic(string , string );
 int FindPrimariaYExtendida(string , string );
 void MontarParticion(string , string );
 int FindLetra(string , string );
 void ImprimirParticinesMontadas();
-
 int FindNumero(string ,string );
 void DesmontarParticion(string);
 void FormatEXT2(int,int,string);
@@ -52,7 +51,6 @@ char ObtenerFit(string,string);
 void login(string,string,string);
 void logout();
 void DesmontarParticionSinMensaje(string,int);
-
 void GraficarMBR(string , string , string );
 //mmadf
 void MKGRP(string);
@@ -62,7 +60,6 @@ void AddUserstxt(string );
 int FindBit(FILE *, char , char );
 void RMGRP(string);
 void REMOVERGRUPO(string);
-
 void MKUSR(string , string , string );
 bool buscarUsuario(string );
 int getID_usr();
@@ -75,22 +72,18 @@ int byteInodoBloque(FILE *,int , char );
 void MKFILE(string ,string ,int ,bool ,string );
 int crearArchivo(string , bool , int , string );
 int nuevoArchivo(FILE *, char , bool , char *, int , string , int ,char *);
-
 bool permisosDeEscritura(int , bool , bool );
 string EliminarComillas(string );
 int nuevaCarpeta(FILE *, char , bool , char *, int );
 string getDirectorio(string );
 void MKDIR(string ,string ,bool );
 int crearCarpeta(string , bool p);
-
-
 void GraficarMBR(string , string , string );
 void GraficarDISCO(string , string , string );
 void REPORTES(string ,string ,string ,string );
 string ObtenerExt(string );
 void GraficarINODEYBLOCK(string ,string ,string,string,string);
 void generarDotINODE(string , string , string ,int ,int ,int );
-
 void GraficarJOURNALING(string ,string ,string ,string );
 void generarDotJOURNALING(string ,string , string ,int );
 void generarDotBLOCK(string , string , string , int , int , int );
@@ -100,11 +93,7 @@ void GraficarFILE(string ,string ,string ,string,string );
 void GraficarLS(string ,string ,string ,string ,string);
 void generarDotFile(string , string , string , string ,int ,int );
 void generarBitmap(string , string , int , int );
-
-
-void CAT(string );
 vector<string> Mkfsids;
-
 
 //Variables globales
 //TODO:ARREGLAR PATH 
@@ -440,15 +429,16 @@ void EjecutarComando(char comando[200]){
                 if(aux[0] == "-PATH"){
                     string auxiliare = auxiliarSinCastear[1];
                     string pathx;
+                    vector<nodoParticionMontada> arreglotmp = arreglonodos;
                     pathx = EliminarComillasYreemplazarEspacios(auxiliare);
                     dir = path +pathx;
                     int cont = arreglonodos.size();
                     for(int i = 0; i < cont;i++){
-                        if(arreglonodos[i].path == dir){
+                        if(arreglotmp[i].path == dir){
                             string vd = "vd";
                             string letra = "";
-                            letra.push_back(arreglonodos[i].letra);
-                            string numero = to_string(arreglonodos[i].numero);
+                            letra.push_back(arreglotmp[i].letra);
+                            string numero = to_string(arreglotmp[i].numero);
                             string id = vd+letra+numero;
                             DesmontarParticionSinMensaje(id,cont);
                             continue;
@@ -1482,8 +1472,9 @@ void DesmontarParticionSinMensaje(string id,int cont){
         letra = arreglonodos[i].letra;
         string numero = to_string(arreglonodos[i].numero);
         idtmp = vd+letra+numero;
-        if(idtmp==id){ 
-            arreglonodos.erase(arreglonodos.begin()+ i);    
+        if(idtmp==id){
+            arreglonodos.erase(arreglonodos.begin()+i);
+            break;    
         }
     }
 }
@@ -2838,9 +2829,7 @@ void MKFILE(string ruta,string Cont,int tamanio,bool P,string name){
     */
     if(name.length() <= 11){
                 if(SesionActiva){
-                    cout<<"entre al mfile sesion atvia"<<endl;
                     int ArchivoCreadoConExito = crearArchivo(ruta,P,tamanio,Cont);
-                    //cout<<ArchivoCreadoConExito<<endl;
                     if(ArchivoCreadoConExito == 1){//Si el metodo nos devuelve que si se creo con exito
                         if(SesionActual.FS == 3){//Si el disco es EXT3
                             char tmp[500];
@@ -4024,10 +4013,6 @@ int crearCarpeta(string path, bool p){
 ////////////////////////////////////////////////////////////////////////////////MANEJO DE REPORTES ///////////////////////////////////////////////////////////////////////////////////////////////////////
 void REPORTES(string NombreReporte,string DestinoReporte,string IdentificadorParticionMontada,string ruta){
     //Recibo el ID en minusculas
-    cout<<"nombre reporte:"<<NombreReporte<<endl;
-    cout<<"carpeta destino reporte:"<<DestinoReporte<<endl;
-    cout<<"id disco reporte:"<<IdentificadorParticionMontada<<endl;
-    cout<<"ruta reporte file/ls:"<<ruta<<endl;
     string idtmp;
     bool flag = false;
     string extension = ObtenerExt(DestinoReporte);

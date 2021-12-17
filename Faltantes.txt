@@ -1,6 +1,0 @@
-// ! PATHS
-1. Solamente genera carpetas/directorios en la ruta quemada que es la del proyecto.
-2. No tengo codificado para aceptar rutas con espacios.
-
-// ! EXEC
-1. La ruta completa donde se encuentre el archivo SCRIPT tiene que estar en mayusculas por lo del casteo total de los comandos

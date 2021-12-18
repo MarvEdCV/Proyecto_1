@@ -63,8 +63,8 @@ CREATE TABLE tmp_project (
   project_id varchar(15) NOT NULL UNIQUE,
   is_geocoded int(2) NOT NULL,
   project_title varchar(250) NOT NULL,
-  start_actual_isodate date NOT NULL,
-  end_actual_isodate date NOT NULL,
+  start_actual_isodate date NULL,
+  end_actual_isodate date NULL,
   donors varchar(15) NOT NULL,
   donors_iso3 varchar(5) NOT NULL,
   recipients int(11) NOT NULL,
@@ -92,5 +92,5 @@ transaction_value decimal(16.5) NULL
 CREATE TABLE tmp_status(
 idStatus int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
 name varchar(25) NOT NULL UNIQUE
-);
+);  
 show tables;

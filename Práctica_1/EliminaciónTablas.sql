@@ -1,0 +1,10 @@
+use Practica1;
+drop table if exists transaction; 
+drop table if exists Currency;
+drop table if exists Level;
+drop table if exists project;
+drop table if exists status;
+drop table if exists geoName; 
+drop table if exists countryCodes;
+drop table if exists Locations; 
+show tables;

@@ -43,14 +43,12 @@ cc.name_oecd_name,
 cc.name_un_code,
 cc.name_wb_code
 from tmp_countryCodes as cc;
+SET FOREIGN_KEY_CHECKS = 1;
 
-insert into Currency(
-name_Currency
-)
-select distinct
-cur.transaction_currency
-from tmp_transaction as cur;
 
+
+
+SET FOREIGN_KEY_CHECKS = 0;
 insert into geoName(
 idGeoname,
 place_name,
@@ -62,7 +60,7 @@ gazetteer_adm_name,
 location_class,
 geographic_exactness
 )
-select distinct
+select 
 gn.idGeoname,
 gn.place_name,
 gn.latitude,
@@ -73,7 +71,9 @@ gn.gazetteer_adm_name,
 gn.location_class,
 gn.geographic_exactness
 from tmp_geoName as gn;
+SET FOREIGN_KEY_CHECKS = 1;
 
+SET FOREIGN_KEY_CHECKS = 0;
 insert into Level(
 project_id,
 project_location_id,
@@ -92,7 +92,10 @@ lev.transactions_end_year_,
 lev.event_split_commitments,
 lev.event_split_disbursements
 from tmp_Level as lev;
+SET FOREIGN_KEY_CHECKS = 1;
 
+
+SET FOREIGN_KEY_CHECKS = 0;
 insert into Locations(
 location_type_code,
 location_type_name
@@ -101,14 +104,11 @@ select distinct
 tmloc.location_type_code,
 tmloc.location_type_name
 from tmp_Locations as tmloc;
+SET FOREIGN_KEY_CHECKS = 1;
 
-insert into status(
-name
-)
-select distinct
-pro.status
-from tmp_project as pro;
 
+
+SET FOREIGN_KEY_CHECKS = 0;
 insert into project(
 project_id,
 is_geocoded,
@@ -145,7 +145,10 @@ tmp.transactions_end_year ,
 tmp.total_commitments ,
 tmp.total_disbursements 
 from tmp_project as tmp;
+SET FOREIGN_KEY_CHECKS = 1;
 
+
+SET FOREIGN_KEY_CHECKS = 0;
 insert into transaction(
 id_transaction,
 idProject,
@@ -164,7 +167,6 @@ trans.transaction_value_code ,
 trans.transaction_currency ,
 trans.transaction_value 
 from tmp_transaction as trans;
-
-
-
 SET FOREIGN_KEY_CHECKS = 1;
+
+

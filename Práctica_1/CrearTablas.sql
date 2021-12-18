@@ -1,3 +1,6 @@
+
+use Practica1;
+
 create table countryCodes(
   id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   name    varchar(50) NOT NULL UNIQUE,
@@ -113,3 +116,4 @@ ADD FOREIGN KEY (project_id) REFERENCES project(idProyecto);
 ALTER TABLE Level
 ADD FOREIGN KEY (geoname_id) REFERENCES geoName(id);
 
+show tables;

@@ -1,15 +1,15 @@
 
-create user 'empleado1'@'localhost' identified by 'empleado';
-grant select on Practia1.* to empleado; 
-create user 'Administrador1'@'localhost' identified by 'Administrador';
-grant all on Practica1.* to Administrador; 
+create user 'empleado1'@'localhost' identified by '$Empleado123-$';
+grant select on Practia1.* to 'empleado1'@'localhost'; 
+create user 'Administrador1'@'localhost' identified by '$Empleado123-$';
+grant all on Practica1.* to 'Administrador1'@'localhost'; 
 
 mysql --local-infile=1 -u root -p
 SELECT User, Host FROM mysql.user;
-mysql --local-infile=1 -u empleado1 -pempleado
+mysql --local-infile=1 -u empleado1 -p$Empleado123-$
 show grants;
 create database PruebaEmpleado;
-mysql --local-infile=1 -u Administrador1 -pAdministrador
+mysql --local-infile=1 -u Administrador1 -p$Empleado123-$
 show grants;
 
 select * from tmp_countryCodes;
